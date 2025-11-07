@@ -528,9 +528,14 @@ async function callOptimizeDemo() {
 
   try {
     const url =
-      `/optimize?demandTon=${encodeURIComponent(demandTon)}`
-      + `&distanceKm=${encodeURIComponent(distanceKm)}`
-      + `&scenario=${encodeURIComponent(scenario)}`;
+  `/tariff/calc`
+  + `?origin=${encodeURIComponent(origin)}`
+  + `&destination=${encodeURIComponent(destination)}`
+  + `&distanceKm=${encodeURIComponent(distanceKm)}`
+  + `&weightTon=${encodeURIComponent(weightTon)}`
+  + `&stops=${encodeURIComponent(3)}`
+  + `&vehicleType=${encodeURIComponent(vehicleType)}`
+  + `&vendorType=${encodeURIComponent(vendorType)}`;
 
     const res = await fetch(url);
     if (!res.ok) {
@@ -580,6 +585,7 @@ async function callOptimizeDemo() {
 </script>    
 </body>
 </html>
+
 
 
 

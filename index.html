@@ -175,413 +175,355 @@
     // *** ใส่ Token Cesium Ion ของคุณเองตรงนี้ ***
     Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkYWQ1OWUwOS1mYjE3LTRkMWItYmVmOC1mNGY2MDljOGJhMWIiLCJpZCI6MzU4MDMzLCJpYXQiOjE3NjI0ODM2ODh9.m6qoHZhEGlI40OWp5E7x5v8YIFIzTTiyhYV5T-50BAQ';
 
-    const viewer = new Cesium.Viewer('cesiumContainer', {
-      animation:false,
-      timeline:false,
-      baseLayerPicker:true,
-      geocoder:false,
-      sceneModePicker:true
-    });
+      const viewer = new Cesium.Viewer('cesiumContainer', {
+    animation:false,
+    timeline:false,
+    baseLayerPicker:true,
+    geocoder:false,
+    sceneModePicker:true
+  });
 
-    let locations = [];
-    let materials = [];
-    let trucks = [];
-    let orders = [];
-    let scenarioMode = 'mixed';
-    let routeEntities = []; // {id, entity, mode}
+  let locations = [];
+  let materials = [];
+  let trucks = [];
+  let orders = [];
+  let scenarioMode = 'mixed';
+  let routeEntities = [];
 
-    // โหลด master + orders
-    Promise.all([
-      fetch('locations.json').then(r=>r.json()),
-      fetch('materials.json').then(r=>r.json()),
-      fetch('trucks.json').then(r=>r.json()),
-      fetch('orders.json').then(r=>r.json())
-    ]).then(([loc, mat, trk, ord]) => {
-      locations = loc;
-      materials = mat;
-      trucks = trk;
-      orders = ord;
-      initUI();
-      plotLocations();
-      flyToThailand();
-    }).catch(err => {
-      console.error(err);
-      document.getElementById('routeSummary').innerHTML =
-        'โหลดไฟล์ locations/materials/trucks/orders ไม่ได้ ตรวจสอบชื่อไฟล์และ GitHub Pages อีกครั้ง';
-    });
+  // โหลด master + orders (ถ้าไม่มี orders.json จะใช้ [] แทน)
+  Promise.all([
+    fetch('locations.json').then(r => r.json()),
+    fetch('materials.json').then(r => r.json()),
+    fetch('trucks.json').then(r => r.json()),
+    fetch('orders.json').then(r => r.ok ? r.json() : [])
+  ]).then(([loc, mat, trk, ord]) => {
+    locations = loc;
+    materials = mat;
+    trucks = trk;
+    orders = ord || [];
+    initUI();
+    plotLocations();
+    flyToThailand();
+  }).catch(err => {
+    console.error(err);
+    const el = document.getElementById('routeSummary');
+    if (el) el.innerHTML = 'โหลดไฟล์ไม่สำเร็จ: ' + err.message;
+  });
 
-    function initUI(){
-      const plantSelect = document.getElementById('plantSelect');
+  function initUI(){
+    const plantSelect = document.getElementById('plantSelect');
+    if (plantSelect) {
       locations.filter(l => l.type === 'plant').forEach(p => {
         const opt = document.createElement('option');
         opt.value = p.locationId;
         opt.textContent = p.name;
         plantSelect.appendChild(opt);
       });
-      
-       if(plantSelect.options.length > 0){
-         plantSelect.selectedIndex = 0;
-       }
-      document.querySelectorAll('#scenarioChips .chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-          document.querySelectorAll('#scenarioChips .chip').forEach(c => c.classList.remove('active'));
-          chip.classList.add('active');
-          scenarioMode = chip.dataset.mode;
-        });
-      });
-      document.getElementById('btnPlan').addEventListener('click', buildPlanFromOrders);
-       // 🔹 ปุ่มทดสอบเรียก Optimize API
-      const btnTest = document.getElementById('btnTestOptimize');
-      if (btnTest) {
-        btnTest.addEventListener('click', callOptimizeDemo);
-        }
-      }      
-
-      // default: ถ้ามี plant แรก เลือกให้เลย
-      if(plantSelect.options.length > 0){
+      if (plantSelect.options.length > 0) {
         plantSelect.selectedIndex = 0;
       }
+    }
 
-      // scenario chips
-      document.querySelectorAll('#scenarioChips .chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-          document.querySelectorAll('#scenarioChips .chip').forEach(c => c.classList.remove('active'));
-          chip.classList.add('active');
-          scenarioMode = chip.dataset.mode;
-        });
+    const chips = document.querySelectorAll('#scenarioChips .chip');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        scenarioMode = chip.dataset.mode;
       });
+    });
 
-      document.getElementById('btnPlan').addEventListener('click', buildPlanFromOrders);
+    const planBtn = document.getElementById('btnPlan');
+    if (planBtn) {
+      planBtn.addEventListener('click', buildPlanFromOrders);
     }
 
-    function flyToThailand(){
-      viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(100.5, 15.5, 2500000.0)
-      });
+    const btnTest = document.getElementById('btnTestOptimize');
+    if (btnTest) {
+      btnTest.addEventListener('click', callOptimizeDemo);
     }
+  }
 
-    function plotLocations(){
-      locations.forEach(loc => {
-        let color = Cesium.Color.WHITE;
-        if(loc.type === 'plant') color = Cesium.Color.fromBytes(31,119,180);
-        if(loc.type === 'yard') color = Cesium.Color.fromBytes(255,127,14);
-        if(loc.type === 'junkshop') color = Cesium.Color.fromBytes(44,160,44);
-        if(loc.type === 'depot') color = Cesium.Color.fromBytes(148,103,189);
+  function flyToThailand(){
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(100.5, 15.5, 2500000.0)
+    });
+  }
 
-        viewer.entities.add({
-          position: Cesium.Cartesian3.fromDegrees(loc.lng, loc.lat),
-          point: {
-            pixelSize: 9,
-            color: color,
-            outlineColor: Cesium.Color.WHITE,
-            outlineWidth: 1
-          },
-          label: {
-            text: loc.name,
-            font: '10px sans-serif',
-            pixelOffset: new Cesium.Cartesian2(0, -14),
-            fillColor: Cesium.Color.fromCssColorString('#223'),
-            showBackground: true,
-            backgroundColor: Cesium.Color.fromCssColorString('rgba(255,255,255,0.85)'),
-            scaleByDistance: new Cesium.NearFarScalar(50000,1.0,800000,0.25)
-          },
-          properties: {
-            locationId: loc.locationId,
-            type: loc.type
-          }
-        });
-      });
-    }
+  function plotLocations(){
+    locations.forEach(loc => {
+      let color = Cesium.Color.WHITE;
+      if(loc.type === 'plant') color = Cesium.Color.fromBytes(31,119,180);
+      if(loc.type === 'yard') color = Cesium.Color.fromBytes(255,127,14);
+      if(loc.type === 'junkshop') color = Cesium.Color.fromBytes(44,160,44);
+      if(loc.type === 'depot') color = Cesium.Color.fromBytes(148,103,189);
 
-    function clearRoutes(){
-      routeEntities.forEach(r => viewer.entities.remove(r.entity));
-      routeEntities = [];
-    }
-
-    // ====== CORE LOGIC: อ่าน orders → รวมโหลด → แบ่ง Route → คำนวณต้นทุน ======
-
-    function buildPlanFromOrders(){
-      clearRoutes();
-
-      const plantId = document.getElementById('plantSelect').value;
-      const originTypeFilter = document.getElementById('originTypeSelect').value;
-      const plant = locations.find(l => l.locationId === plantId);
-      if(!plant){
-        alert('ยังไม่ได้กำหนด Plant ใน locations.json');
-        return;
-      }
-
-      // 1) รวมปริมาณตาม origin จาก orders.json (หลาย material รวมกัน)
-      const demandByOrigin = {}; // originId -> {weightKg, volumeM3}
-      orders.forEach(order => {
-        const origin = locations.find(l => l.locationId === order.originLocationId);
-        if(!origin) return;
-
-        // filter ตามประเภทที่เลือก (yard/junkshop/all)
-        if(originTypeFilter !== 'all' && origin.type !== originTypeFilter) return;
-
-        if(!demandByOrigin[origin.locationId]){
-          demandByOrigin[origin.locationId] = {weightKg:0, volumeM3:0, origin};
+      viewer.entities.add({
+        position: Cesium.Cartesian3.fromDegrees(loc.lng, loc.lat),
+        point: {
+          pixelSize: 9,
+          color: color,
+          outlineColor: Cesium.Color.WHITE,
+          outlineWidth: 1
+        },
+        label: {
+          text: loc.name,
+          font: '10px sans-serif',
+          pixelOffset: new Cesium.Cartesian2(0, -14),
+          fillColor: Cesium.Color.fromCssColorString('#223'),
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(255,255,255,0.85)'),
+          scaleByDistance: new Cesium.NearFarScalar(50000,1.0,800000,0.25)
+        },
+        properties: {
+          locationId: loc.locationId,
+          type: loc.type
         }
-
-        order.lines.forEach(line => {
-          const mat = materials.find(m => m.materialId === line.materialId);
-          if(!mat) return;
-          demandByOrigin[origin.locationId].weightKg += mat.avgWeightPerUnitKg * line.qtyUnit;
-          demandByOrigin[origin.locationId].volumeM3 += mat.avgVolumePerUnitM3 * line.qtyUnit;
-        });
       });
+    });
+  }
 
-      const originIds = Object.keys(demandByOrigin);
-      if(originIds.length === 0){
-        document.getElementById('routeSummary').innerHTML =
-          'ไม่มี order ตรงกับประเภทจุด/plant ที่เลือก (เช็ค orders.json หรือ filter ด้านบน)';
-        return;
+  function clearRoutes(){
+    routeEntities.forEach(r => viewer.entities.remove(r.entity));
+    routeEntities = [];
+  }
+
+  function buildPlanFromOrders(){
+    clearRoutes();
+    const summaryEl = document.getElementById('routeSummary');
+
+    const plantSelect = document.getElementById('plantSelect');
+    const plantId = plantSelect ? plantSelect.value : null;
+    const originTypeFilter = document.getElementById('originTypeSelect')?.value || 'all';
+    const plant = locations.find(l => l.locationId === plantId);
+
+    if (!plant) {
+      if (summaryEl) summaryEl.innerHTML = 'ยังไม่ได้เลือก Plant หรือไม่มีใน locations.json';
+      return;
+    }
+
+    const demandByOrigin = {};
+    (orders || []).forEach(order => {
+      const origin = locations.find(l => l.locationId === order.originLocationId);
+      if (!origin) return;
+      if (originTypeFilter !== 'all' && origin.type !== originTypeFilter) return;
+      if (!demandByOrigin[origin.locationId]) {
+        demandByOrigin[origin.locationId] = { weightKg: 0, volumeM3: 0, origin };
       }
+      (order.lines || []).forEach(line => {
+        const mat = materials.find(m => m.materialId === line.materialId);
+        if (!mat) return;
+        demandByOrigin[origin.locationId].weightKg += (mat.avgWeightPerUnitKg || 0) * line.qtyUnit;
+        demandByOrigin[origin.locationId].volumeM3 += (mat.avgVolumePerUnitM3 || 0) * line.qtyUnit;
+      });
+    });
 
-      // 2) เลือกรถตาม scenario
-      const ownTrucks = trucks.filter(t => t.ownerType === 'OWN');
-      const vendorTrucks = trucks.filter(t => t.ownerType === 'OUTSOURCE');
+    const originIds = Object.keys(demandByOrigin);
+    if (originIds.length === 0) {
+      if (summaryEl) summaryEl.innerHTML = 'ไม่มี orders ตรงกับ filter หรือยังไม่มี orders.json';
+      return;
+    }
 
-      let routeHtml = '';
-      let routeIndex = 1;
-      let totalCost = 0;
-      let totalTon = 0;
+    const ownTrucks = trucks.filter(t => t.ownerType === 'OWN');
+    const vendorTrucks = trucks.filter(t => t.ownerType === 'OUTSOURCE');
 
-      originIds.forEach(originId => {
-        const d = demandByOrigin[originId];
-        const origin = d.origin;
-        let remainingKg = d.weightKg;
-        let remainingVol = d.volumeM3;
+    let routeHtml = '';
+    let routeIndex = 1;
+    let totalCost = 0;
+    let totalTon = 0;
 
-        if(remainingKg <= 0 || remainingVol <= 0) return;
+    originIds.forEach(originId => {
+      const d = demandByOrigin[originId];
+      const origin = d.origin;
+      let remainingKg = d.weightKg;
+      let remainingVol = d.volumeM3;
+      if (remainingKg <= 0 || remainingVol <= 0) return;
 
-        const distanceKm = estimateDistanceKm(origin.lat, origin.lng, plant.lat, plant.lng);
+      const distanceKm = estimateDistanceKm(origin.lat, origin.lng, plant.lat, plant.lng);
 
-        // วนแบ่งเป็นหลาย Route ถ้าโหลดเยอะ
-        while(remainingKg > 50){ // >50กก. ค่อยจัดเป็น trip
-          const candidates = [];
+      while (remainingKg > 50) {
+        const candidates = [];
 
-          // Own
-          if(scenarioMode === 'mixed' || scenarioMode === 'own'){
-            ownTrucks.forEach(tr => {
-              const cap = computeLoadableTonForTruck(tr, remainingKg, remainingVol, d);
-              if(cap.ton > 0){
-                const tripCost = tr.fixedCostPerTrip + tr.costPerKm * distanceKm * 2;
-                const costPerTon = tripCost / cap.ton;
-                candidates.push({
-                  mode:'own', truck:tr, ton:cap.ton, cost:tripCost, costPerTon
-                });
-              }
-            });
-          }
-
-          // Vendor
-          if(scenarioMode === 'mixed' || scenarioMode === 'vendor'){
-            vendorTrucks.forEach(tr => {
-              const cap = computeLoadableTonForTruck(tr, remainingKg, remainingVol, d);
-              if(cap.ton > 0){
-                let tripCost = 0;
-                if(tr.rateType === 'per_ton_km'){
-                  tripCost = tr.rateValue * distanceKm * 2 * cap.ton;
-                } else if(tr.rateType === 'per_km'){
-                  tripCost = tr.rateValue * distanceKm * 2;
-                }
-                if(tr.minCharge && tripCost < tr.minCharge) tripCost = tr.minCharge;
-                const costPerTon = tripCost / cap.ton;
-                candidates.push({
-                  mode:'vendor', truck:tr, ton:cap.ton, cost:tripCost, costPerTon
-                });
-              }
-            });
-          }
-
-          if(candidates.length === 0){
-            // ถ้าไม่มีรถไหนบรรทุกได้ ให้หยุด origin นี้
-            break;
-          }
-
-          // เลือก option ที่ cost/ton ถูกที่สุด
-          candidates.sort((a,b)=>a.costPerTon - b.costPerTon);
-          const chosen = candidates[0];
-
-          // อัปเดต remaining
-          remainingKg -= chosen.ton * 1000;
-          // ประมาณ volume ที่ใช้จาก density รวม
-          const densityKgPerM3 = d.weightKg / d.volumeM3;
-          const usedVol = (chosen.ton * 1000) / densityKgPerM3;
-          remainingVol -= usedVol;
-
-          // วาด Route บน Cesium
-          const color = (chosen.mode === 'own')
-            ? Cesium.Color.fromBytes(22,143,58,230)
-            : Cesium.Color.fromBytes(214,39,40,230);
-
-          const entity = viewer.entities.add({
-            polyline: {
-              positions: Cesium.Cartesian3.fromDegreesArray([
-                plant.lng, plant.lat,
-                origin.lng, origin.lat,
-                plant.lng, plant.lat
-              ]),
-              width: 2,
-              material: color
+        if (scenarioMode === 'mixed' || scenarioMode === 'own') {
+          ownTrucks.forEach(tr => {
+            const cap = computeLoadableTonForTruck(tr, remainingKg, remainingVol, d);
+            if (cap.ton > 0) {
+              const tripCost = tr.fixedCostPerTrip + tr.costPerKm * distanceKm * 2;
+              const cpt = tripCost / cap.ton;
+              candidates.push({ mode:'own', truck:tr, ton:cap.ton, cost:tripCost, costPerTon:cpt });
             }
           });
-
-          const routeId = 'R'+routeIndex;
-          routeEntities.push({id:routeId, entity, mode:chosen.mode});
-
-          // สรุปข้อความ
-          const modeLabel = chosen.mode === 'own' ? 'รถบริษัท' : 'Outsource';
-          const truckLabel = chosen.truck.displayName || chosen.truck.vendorName || chosen.truck.truckType;
-
-          routeHtml += `
-            <div class="route-row ${chosen.mode === 'own' ? 'own':'vendor'}" data-route-id="${routeId}">
-              <b>Route ${routeIndex}:</b>
-              ${origin.name} → ${plant.name}<br/>
-              ${modeLabel} (${truckLabel}),
-              Load ~ ${chosen.ton.toFixed(2)} ton,
-              Dist ~ ${(distanceKm*2).toFixed(1)} km,
-              Cost ≈ ${chosen.cost.toFixed(0)} บาท
-            </div>
-          `;
-
-          totalCost += chosen.cost;
-          totalTon += chosen.ton;
-          routeIndex++;
         }
-      });
 
-      if(routeIndex === 1){
-        document.getElementById('routeSummary').innerHTML =
-          'ไม่สามารถจัด Route ได้ (อาจเพราะไม่มี orders หรือ Scenario จำกัดเกินไป)';
-        return;
-      }
+        if (scenarioMode === 'mixed' || scenarioMode === 'vendor') {
+          vendorTrucks.forEach(tr => {
+            const cap = computeLoadableTonForTruck(tr, remainingKg, remainingVol, d);
+            if (cap.ton > 0) {
+              let tripCost = 0;
+              if (tr.rateType === 'per_ton_km') {
+                tripCost = tr.rateValue * distanceKm * 2 * cap.ton;
+              } else if (tr.rateType === 'per_km') {
+                tripCost = tr.rateValue * distanceKm * 2;
+              }
+              if (tr.minCharge && tripCost < tr.minCharge) tripCost = tr.minCharge;
+              const cpt = tripCost / cap.ton;
+              candidates.push({ mode:'vendor', truck:tr, ton:cap.ton, cost:tripCost, costPerTon:cpt });
+            }
+          });
+        }
 
-      if(totalTon > 0){
-        const avg = totalCost / totalTon;
+        if (candidates.length === 0) break;
+
+        candidates.sort((a,b)=>a.costPerTon - b.costPerTon);
+        const chosen = candidates[0];
+
+        remainingKg -= chosen.ton * 1000;
+        const density = d.volumeM3 > 0 ? (d.weightKg / d.volumeM3) : 1000;
+        const usedVol = (chosen.ton * 1000) / density;
+        remainingVol -= usedVol;
+
+        const color = (chosen.mode === 'own')
+          ? Cesium.Color.fromBytes(22,143,58,230)
+          : Cesium.Color.fromBytes(214,39,40,230);
+
+        const entity = viewer.entities.add({
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArray([
+              plant.lng, plant.lat,
+              origin.lng, origin.lat,
+              plant.lng, plant.lat
+            ]),
+            width: 2 + chosen.ton, // หนาขึ้นตาม ton
+            material: color
+          }
+        });
+
+        const routeId = 'R' + routeIndex;
+        routeEntities.push({ id:routeId, entity, mode:chosen.mode });
+
+        const modeLabel = chosen.mode === 'own' ? 'รถบริษัท' : 'Outsource';
+        const truckLabel = chosen.truck.displayName || chosen.truck.vendorName || chosen.truck.truckType || chosen.truck.id;
+        const loadPct = (chosen.ton * 1000) / (chosen.truck.maxWeightKgLegal || chosen.truck.maxTon*1000) * 100;
+
         routeHtml += `
-          <hr/>
-          <div>
-            <b>สรุปทั้งแผน</b><br/>
-            ปริมาณรวม ~ ${totalTon.toFixed(2)} ton<br/>
-            ต้นทุนรวม ~ ${totalCost.toFixed(0)} บาท<br/>
-            ต้นทุนเฉลี่ย ~ ${avg.toFixed(0)} บาท/ton
+          <div class="route-row ${chosen.mode === 'own' ? 'own':'vendor'}" data-route-id="${routeId}">
+            <b>Route ${routeIndex}:</b> ${origin.name} → ${plant.name}<br/>
+            ${modeLabel} (${truckLabel}) |
+            Load ~ ${chosen.ton.toFixed(2)} ton (${loadPct.toFixed(0)}% กฎหมาย)<br/>
+            Dist ~ ${(distanceKm*2).toFixed(1)} km |
+            Cost ≈ ${chosen.cost.toFixed(0)} บาท
           </div>
         `;
+
+        totalCost += chosen.cost;
+        totalTon += chosen.ton;
+        routeIndex++;
       }
-
-      const summaryEl = document.getElementById('routeSummary');
-      summaryEl.innerHTML = routeHtml;
-
-      // ผูก event คลิก route summary → focus เส้นบนแผนที่
-      document.querySelectorAll('.route-row').forEach(row => {
-        row.addEventListener('click', () => {
-          const id = row.getAttribute('data-route-id');
-          focusRoute(id);
-        });
-      });
-    }
-
-    // คำนวณ load ที่ใส่ได้ใน 1 trip ตามน้ำหนัก + ปริมาตร + ของที่เหลือ (ton)
-    function computeLoadableTonForTruck(truck, remainingKg, remainingVol, demand){
-      const maxTonByWeight = truck.maxWeightKgLegal / 1000;
-      // ใช้ densityรวมของ origin นั้น
-      const densityKgPerM3 = demand.weightKg / demand.volumeM3;
-      const maxTonByVolume = (truck.maxVolumeM3 * densityKgPerM3) / 1000;
-
-      let maxTon = Math.min(maxTonByWeight, maxTonByVolume);
-
-      const remainTon = remainingKg / 1000;
-      if(maxTon > remainTon) maxTon = remainTon;
-
-      // กันไม่ให้ trip เล็กเกินไป
-      if(maxTon < 0.5){
-        return {ton:0};
-      }
-      return {ton:maxTon};
-    }
-
-    // focus route: ขยายเส้น + zoom
-    function focusRoute(routeId){
-      routeEntities.forEach(r => {
-        if(r.id === routeId){
-          r.entity.polyline.width = 5;
-          r.entity.polyline.material = (r.mode === 'own')
-            ? Cesium.Color.fromBytes(0,200,80,255)
-            : Cesium.Color.fromBytes(255,80,80,255);
-
-          const positions = r.entity.polyline.positions.getValue(Cesium.JulianDate.now());
-          if(positions && positions.length >= 2){
-            viewer.flyTo(r.entity, {duration:0.8});
-          }
-        }else{
-          r.entity.polyline.width = 2;
-          r.entity.polyline.material = (r.mode === 'own')
-            ? Cesium.Color.fromBytes(22,143,58,230)
-            : Cesium.Color.fromBytes(214,39,40,230);
-        }
-      });
-    }
-
-    // ระยะทางเส้นตรง (km) สำหรับคิดต้นทุนคร่าว ๆ
-    function estimateDistanceKm(lat1, lon1, lat2, lon2){
-      const R = 6371;
-      const dLat = toRad(lat2-lat1);
-      const dLon = toRad(lon2-lon1);
-      const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
-                Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*
-                Math.sin(dLon/2)*Math.sin(dLon/2);
-      const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return R*c;
-    }
-    function toRad(d){return d*Math.PI/180;}
-    
-    // ===== ทดสอบเรียก API /optimize จาก Cloudflare Functions =====
-async function callOptimizeDemo() {
-  const summaryEl = document.getElementById('routeSummary');
-  if (summaryEl) {
-    summaryEl.innerHTML = 'กำลังเรียก /optimize จาก Cloudflare ...';
-  }
-
-  try {
-    const res = await fetch('/optimize');
-    if (!res.ok) {
-      throw new Error('HTTP ' + res.status);
-    }
-    const data = await res.json();
-
-    // แสดงผลแบบอ่านง่ายใน routeSummary
-    const best = data.best;
-    const lines = [];
-    lines.push(`<b>ผลจาก /optimize (เดโม่)</b>`);
-    lines.push(`ต้องขน: ${data.demandTon} ton, ระยะทาง: ${data.distanceKm} km`);
-    data.options.forEach((opt, i) => {
-      lines.push(
-        `ตัวเลือก ${i+1}: ${opt.mode} (${opt.truckId}) - Trips: ${opt.trips}, `
-        + `Cost: ${opt.totalCost.toFixed(0)} บาท (${opt.costPerTon.toFixed(0)} บาท/ton)`
-      );
     });
-    if (best) {
-      lines.push(
-        `<span style="color:#168f3a;"><b>แนะนำ:</b> ${best.mode} (${best.truckId}), `
-        + `~${best.totalCost.toFixed(0)} บาท (${best.costPerTon.toFixed(0)} บาท/ton)</span>`
-      );
+
+    if (routeIndex === 1) {
+      if (summaryEl) summaryEl.innerHTML = 'ไม่สามารถจัด Route ได้ (ไม่มี candidates หรือ orders)';
+      return;
     }
 
-    if (summaryEl) {
-      summaryEl.innerHTML = lines.join('<br/>');
+    if (totalTon > 0) {
+      const avg = totalCost / totalTon;
+      routeHtml += `
+        <hr/>
+        <div>
+          <b>สรุปทั้งแผน</b><br/>
+          ปริมาณรวม ~ ${totalTon.toFixed(2)} ton<br/>
+          ต้นทุนรวม ~ ${totalCost.toFixed(0)} บาท<br/>
+          ต้นทุนเฉลี่ย ~ ${avg.toFixed(0)} บาท/ton
+        </div>
+      `;
     }
-  } catch (err) {
-    console.error(err);
+
+    if (summaryEl) summaryEl.innerHTML = routeHtml;
+
+    document.querySelectorAll('.route-row').forEach(row => {
+      row.addEventListener('click', () => {
+        const id = row.getAttribute('data-route-id');
+        focusRoute(id);
+      });
+    });
+  }
+
+  function computeLoadableTonForTruck(truck, remainingKg, remainingVol, demand){
+    const legalKg = truck.maxWeightKgLegal || (truck.maxTon ? truck.maxTon * 1000 : 0);
+    const maxTonByWeight = legalKg > 0 ? legalKg / 1000 : 9999;
+    const density = demand.volumeM3 > 0 ? (demand.weightKg / demand.volumeM3) : 1000;
+    const maxTonByVolume = (truck.maxVolumeM3 || 9999) * density / 1000;
+    let maxTon = Math.min(maxTonByWeight, maxTonByVolume);
+    const remainTon = remainingKg / 1000;
+    if (maxTon > remainTon) maxTon = remainTon;
+    if (maxTon < 0.5) return { ton:0 };
+    return { ton:maxTon };
+  }
+
+  function focusRoute(routeId){
+    routeEntities.forEach(r => {
+      if (r.id === routeId) {
+        r.entity.polyline.width = 6;
+        r.entity.polyline.material = (r.mode === 'own')
+          ? Cesium.Color.fromBytes(0,200,80,255)
+          : Cesium.Color.fromBytes(255,80,80,255);
+        viewer.flyTo(r.entity, { duration: 0.8 });
+      } else {
+        r.entity.polyline.width = 2;
+        r.entity.polyline.material = (r.mode === 'own')
+          ? Cesium.Color.fromBytes(22,143,58,230)
+          : Cesium.Color.fromBytes(214,39,40,230);
+      }
+    });
+  }
+
+  function estimateDistanceKm(lat1, lon1, lat2, lon2){
+    const R = 6371;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+              Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*
+              Math.sin(dLon/2)*Math.sin(dLon/2);
+    const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R*c;
+  }
+  function toRad(d){ return d*Math.PI/180; }
+
+  // เรียก /optimize จาก Cloudflare แล้วเอาผลมาแสดงใน routeSummary
+  async function callOptimizeDemo() {
+    const summaryEl = document.getElementById('routeSummary');
     if (summaryEl) {
-      summaryEl.innerHTML = 'เรียก /optimize ไม่สำเร็จ: ' + err.message;
+      summaryEl.innerHTML = 'กำลังเรียก /optimize จาก Cloudflare ...';
+    }
+    try {
+      const res = await fetch('/optimize');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const best = data.best;
+      const lines = [];
+      lines.push('<b>ผลจาก /optimize (เดโม่)</b>');
+      lines.push(`ต้องขน: ${data.demandTon} ton, ระยะทาง: ${data.distanceKm} km`);
+      (data.options || []).forEach((opt, i) => {
+        lines.push(
+          `ตัวเลือก ${i+1}: ${opt.mode} (${opt.truckId}) - Trips: ${opt.trips}, `
+          + `Cost: ${opt.totalCost.toFixed(0)} บาท (${opt.costPerTon.toFixed(0)} บาท/ton)`
+        );
+      });
+      if (best) {
+        lines.push(
+          `<span style="color:#168f3a;"><b>แนะนำ:</b> ${best.mode} (${best.truckId}), `
+          + `${best.totalCost.toFixed(0)} บาท (${best.costPerTon.toFixed(0)} บาท/ton)</span>`
+        );
+      }
+      if (summaryEl) summaryEl.innerHTML = lines.join('<br/>');
+    } catch (err) {
+      console.error(err);
+      if (summaryEl) summaryEl.innerHTML = 'เรียก /optimize ไม่สำเร็จ: ' + err.message;
     }
   }
-}
-    
-  </script>
+</script>    
 </body>
 </html>
+
 

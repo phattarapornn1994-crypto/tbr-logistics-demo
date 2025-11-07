@@ -531,14 +531,10 @@ async function callOptimizeDemo() {
 
   try {
 const url =
-  `/tariff/calc`
-  + `?origin=${encodeURIComponent(origin)}`
-  + `&destination=${encodeURIComponent(destination)}`
+  `/optimize`
+  + `?demandTon=${encodeURIComponent(demandTon)}`
   + `&distanceKm=${encodeURIComponent(distanceKm)}`
-  + `&weightTon=${encodeURIComponent(weightTon)}`
-  + `&stops=${encodeURIComponent(3)}`
-  + `&vehicleType=${encodeURIComponent(vehicleType)}`
-  + `&vendorType=${encodeURIComponent(vendorType)}`;
+  + `&scenario=${encodeURIComponent(scenario)}`;
 
     const res = await fetch(url);
     if (!res.ok) {
@@ -588,6 +584,7 @@ const url =
 </script>    
 </body>
 </html>
+
 
 
 

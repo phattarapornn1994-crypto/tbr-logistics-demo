@@ -487,6 +487,74 @@ routeEntities.push({
         focusRoute(id);
       });
     });
+    enrichRoutesWithTariff();
+    // เติมต้นทุนจาก /tariff/calc ให้แต่ละ Route
+async function enrichRoutesWithTariff() {
+  const summaryEl = document.getElementById('routeSummary');
+  if (!summaryEl || routeEntities.length === 0) return;
+
+  try {
+    const calls = routeEntities.map(r => {
+      const url =
+        `/tariff/calc`
+        + `?origin=${encodeURIComponent(r.originId)}`
+        + `&destination=${encodeURIComponent(r.plantId)}`
+        + `&distanceKm=${encodeURIComponent(r.distanceKm)}`
+        + `&weightTon=${encodeURIComponent(r.ton)}`
+        + `&stops=${encodeURIComponent(3)}`
+        + `&vehicleType=${encodeURIComponent('10W')}`
+        + `&vendorType=${encodeURIComponent(r.mode === 'own' ? 'OWN' : 'SUB')}`;
+
+      return fetch(url).then(res =>
+        res.json().then(data => ({ res, data, id: r.id }))
+      );
+    });
+
+    const results = await Promise.all(calls);
+
+    results.forEach(({ res, data, id }) => {
+      if (!res || !res.ok || !data || !data.breakdown) return;
+      const row = document.querySelector(`.route-row[data-route-id="${id}"]`);
+      if (!row) return;
+      const b = data.breakdown;
+      const costPerTon = b.total / (data.input.weightTon || 1);
+
+      const extra = `
+        <div style="font-size:9px;color:#444;">
+          Tariff Total: ${b.total.toLocaleString()} บาท
+          (${costPerTon.toFixed(0)} บ./ton รวมน้ำมัน)
+        </div>
+      `;
+      row.insertAdjacentHTML('beforeend', extra);
+    });
+
+    let total = 0;
+    let totalTon = 0;
+    results.forEach(({ res, data }) => {
+      if (!res || !res.ok || !data || !data.breakdown) return;
+      total += data.breakdown.total || 0;
+      totalTon += data.input.weightTon || 0;
+    });
+
+    if (totalTon > 0) {
+      const avg = total / totalTon;
+      summaryEl.insertAdjacentHTML(
+        'beforeend',
+        `
+        <hr/>
+        <div style="font-size:10px;">
+          <b>Tariff Summary (ทุก Route):</b><br/>
+          รวมต้นทุนตาม Tariff ~ ${total.toLocaleString()} บาท<br/>
+          เฉลี่ย ~ ${avg.toFixed(0)} บาท/ton
+        </div>
+        `
+      );
+    }
+  } catch (err) {
+    console.error(err);
+  }
+}
+
   }
 
   function computeLoadableTonForTruck(truck, remainingKg, remainingVol, demand){
@@ -701,6 +769,7 @@ async function callTariffDemo() {
 </script>    
 </body>
 </html>
+
 
 
 

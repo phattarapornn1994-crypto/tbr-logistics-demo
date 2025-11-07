@@ -1,0 +1,58 @@
+[
+  {
+    "materialId": "GLASS_620_CRATE",
+    "name": "ขวดแก้ว 620 ml (ลัง)",
+    "category": "glass_return",
+    "unitType": "crate",
+    "avgWeightPerUnitKg": 18,
+    "avgVolumePerUnitM3": 0.05
+  },
+  {
+    "materialId": "GLASS_620_PALLET",
+    "name": "ขวดแก้ว 620 ml (pallet)",
+    "category": "glass_return",
+    "unitType": "pallet",
+    "avgWeightPerUnitKg": 800,
+    "avgVolumePerUnitM3": 1.2
+  },
+  {
+    "materialId": "CULLET_MIX",
+    "name": "เศษแก้วคละ (cullet)",
+    "category": "glass_cullet",
+    "unitType": "ton",
+    "avgWeightPerUnitKg": 1000,
+    "avgVolumePerUnitM3": 0.7
+  },
+  {
+    "materialId": "PAPER_BALE",
+    "name": "กระดาษอัดก้อน",
+    "category": "paper",
+    "unitType": "bale",
+    "avgWeightPerUnitKg": 350,
+    "avgVolumePerUnitM3": 0.6
+  },
+  {
+    "materialId": "PET_BALE",
+    "name": "PET อัดก้อน",
+    "category": "pet",
+    "unitType": "bale",
+    "avgWeightPerUnitKg": 280,
+    "avgVolumePerUnitM3": 0.5
+  },
+  {
+    "materialId": "UBC_BALE",
+    "name": "UBC อัดก้อน",
+    "category": "ubc",
+    "unitType": "bale",
+    "avgWeightPerUnitKg": 150,
+    "avgVolumePerUnitM3": 0.45
+  },
+  {
+    "materialId": "HDPE_BALE",
+    "name": "HDPE อัดก้อน",
+    "category": "hdpe",
+    "unitType": "bale",
+    "avgWeightPerUnitKg": 300,
+    "avgVolumePerUnitM3": 0.5
+  }
+]

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <title>Logistics Planner 3D | Recycling Fleet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Cesium CSS -->
+  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.123/Build/Cesium/Widgets/widgets.css">
+  <style>
+    :root {
+      --brand:#168f3a;
+      --bg:#f4f6f4;
+      --ink:#132321;
+      --card:#ffffff;
+      --border:#d6e4da;
+    }
+    *{box-sizing:border-box;font-family:"Segoe UI","Kanit",sans-serif;}
+    body{margin:0;display:flex;flex-direction:row;height:100vh;background:var(--bg);color:var(--ink);}
+    #sidebar{
+      width:340px;
+      padding:14px;
+      border-right:1px solid var(--border);
+      background:rgba(255,255,255,0.96);
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .brand{
+      font-weight:700;
+      font-size:18px;
+      color:var(--brand);
+    }
+    .tagline{
+      font-size:11px;
+      color:#6b7b72;
+      margin-top:-4px;
+    }
+    label{font-size:11px;color:#556;}
+    select,button{
+      width:100%;
+      padding:6px 8px;
+      margin-top:2px;
+      font-size:11px;
+      border-radius:6px;
+      border:1px solid var(--border);
+      background:#fff;
+    }
+    button{
+      background:var(--brand);
+      color:#fff;
+      font-weight:600;
+      border:none;
+      cursor:pointer;
+    }
+    button:hover{opacity:0.9;}
+    .section{
+      padding:8px;
+      background:var(--card);
+      border-radius:10px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.03);
+      border:1px solid var(--border);
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px;}
+    .chip{
+      padding:2px 6px;
+      border-radius:999px;
+      font-size:9px;
+      border:1px solid var(--border);
+      background:#f7faf7;
+      cursor:pointer;
+    }
+    .chip.active{
+      background:var(--brand);
+      color:#fff;
+      border-color:var(--brand);
+    }
+    #routeSummary{
+      font-size:10px;
+      line-height:1.5;
+      max-height:110px;
+      overflow-y:auto;
+      margin-top:4px;
+      border-top:1px dashed var(--border);
+      padding-top:4px;
+    }
+    #cesiumContainer{flex:1;}
+    .legend{
+      display:flex;
+      flex-wrap:wrap;
+      gap:4px;
+      font-size:9px;
+      margin-top:2px;
+    }
+    .legend span{
+      display:inline-flex;
+      align-items:center;
+      gap:3px;
+    }
+    .dot{
+      width:9px;height:9px;border-radius:999px;display:inline-block;
+    }
+    .dot-plant{background:#1f77b4;}
+    .dot-yard{background:#ff7f0e;}
+    .dot-js{background:#2ca02c;}
+    .dot-depot{background:#9467bd;}
+    .dot-route-own{background:#168f3a;}
+    .dot-route-out{background:#d62728;}
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <div>
+      <div class="brand">Logistics Planner 3D</div>
+      <div class="tagline">วางแผนรถ • น้ำหนักตามกฎหมาย • เลือก Own vs Outsource</div>
+    </div>
+
+    <div class="section">
+      <label>Scenario การใช้รถ</label>
+      <div class="chips" id="scenarioChips">
+        <div class="chip active" data-mode="mixed">Mixed (Own + Outsource)</div>
+        <div class="chip" data-mode="own">Own Only</div>
+        <div class="chip" data-mode="vendor">Outsource Only</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <label>เลือกปลายทางโรงงาน (Plant)</label>
+      <select id="plantSelect"></select>
+
+      <label>กรองประเภทจุดรับของ</label>
+      <select id="originTypeSelect">
+        <option value="all">ทั้งหมด</option>
+        <option value="yard">ลาน</option>
+        <option value="junkshop">ร้านรับซื้อ</option>
+      </select>
+
+      <button id="btnPlan">คำนวณแผนตัวอย่าง</button>
+
+      <div class="legend">
+        <span><span class="dot dot-plant"></span>Plant</span>
+        <span><span class="dot dot-yard"></span>Yard</span>
+        <span><span class="dot dot-js"></span>Junk Shop</span>
+        <span><span class="dot dot-depot"></span>Depot</span>
+        <span><span class="dot dot-route-own"></span>Route Own</span>
+        <span><span class="dot dot-route-out"></span>Route Outsource</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <div style="font-size:11px;font-weight:600;">สรุปต้นทุน (Demo)</div>
+      <div id="routeSummary">กด "คำนวณแผนตัวอย่าง" เพื่อดูเส้นทางและต้นทุนเปรียบเทียบ</div>
+    </div>
+  </div>
+
+  <div id="cesiumContainer"></div>
+
+  <!-- Cesium JS -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.123/Build/Cesium/Cesium.js"></script>
+  <script>
+    // TODO: ใส่ Token จริงของคุณเอง
+    Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJkYWQ1OWUwOS1mYjE3LTRkMWItYmVmOC1mNGY2MDljOGJhMWIiLCJpZCI6MzU4MDMzLCJpYXQiOjE3NjI0ODM2ODh9.m6qoHZhEGlI40OWp5E7x5v8YIFIzTTiyhYV5T-50BAQ';
+
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      animation:false,
+      timeline:false,
+      baseLayerPicker:true,
+      geocoder:false,
+      sceneModePicker:true
+    });
+
+    let locations = [];
+    let materials = [];
+    let trucks = [];
+    let scenarioMode = 'mixed';
+    let routeEntities = [];
+
+    // โหลด master
+    Promise.all([
+      fetch('locations.json').then(r=>r.json()),
+      fetch('materials.json').then(r=>r.json()),
+      fetch('trucks.json').then(r=>r.json())
+    ]).then(([loc, mat, trk]) => {
+      locations = loc;
+      materials = mat;
+      trucks = trk;
+      initUI();
+      plotLocations();
+      flyToThailand();
+    }).catch(err => {
+      console.error(err);
+      alert('โหลดไฟล์ master ไม่ได้ ดูชื่อไฟล์/พาธอีกครั้ง');
+    });
+
+    function initUI(){
+      const plantSelect = document.getElementById('plantSelect');
+      locations.filter(l => l.type === 'plant').forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.locationId;
+        opt.textContent = p.name;
+        plantSelect.appendChild(opt);
+      });
+
+      // scenario toggle
+      document.querySelectorAll('#scenarioChips .chip').forEach(chip=>{
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('#scenarioChips .chip').forEach(c=>c.classList.remove('active'));
+          chip.classList.add('active');
+          scenarioMode = chip.dataset.mode;
+        });
+      });
+
+      document.getElementById('btnPlan').addEventListener('click', demoPlanRoutes);
+    }
+
+    function flyToThailand(){
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(100.5, 15.5, 2500000.0)
+      });
+    }
+
+    function plotLocations(){
+      locations.forEach(loc => {
+        let color = Cesium.Color.WHITE;
+        if(loc.type === 'plant') color = Cesium.Color.fromBytes(31,119,180);
+        if(loc.type === 'yard') color = Cesium.Color.fromBytes(255,127,14);
+        if(loc.type === 'junkshop') color = Cesium.Color.fromBytes(44,160,44);
+        if(loc.type === 'depot') color = Cesium.Color.fromBytes(148,103,189);
+
+        viewer.entities.add({
+          position: Cesium.Cartesian3.fromDegrees(loc.lng, loc.lat),
+          point: {
+            pixelSize: 9,
+            color: color,
+            outlineColor: Cesium.Color.WHITE,
+            outlineWidth: 1
+          },
+          label: {
+            text: loc.name,
+            font: '10px sans-serif',
+            pixelOffset: new Cesium.Cartesian2(0, -14),
+            fillColor: Cesium.Color.fromCssColorString('#223'),
+            showBackground: true,
+            backgroundColor: Cesium.Color.fromCssColorString('rgba(255,255,255,0.8)'),
+            scaleByDistance: new Cesium.NearFarScalar(50000,1.0,800000,0.2)
+          },
+          properties: {
+            locationId: loc.locationId,
+            type: loc.type
+          }
+        });
+      });
+    }
+
+    function clearRoutes(){
+      routeEntities.forEach(e => viewer.entities.remove(e));
+      routeEntities = [];
+    }
+
+    // ฟังก์ชันตัวอย่าง: สร้าง "แผนจำลอง" ง่ายๆ เพื่อให้เห็น concept
+    function demoPlanRoutes(){
+      clearRoutes();
+
+      const plantId = document.getElementById('plantSelect').value;
+      const originType = document.getElementById('originTypeSelect').value;
+      const plant = locations.find(l => l.locationId === plantId);
+      if(!plant){
+        alert('ยังไม่มี plant ใน locations.json');
+        return;
+      }
+
+      // เลือกต้นทาง (demo: เอาทุกจุดที่ไม่ใช่ plant/depot + filter type)
+      let origins = locations.filter(l => l.locationId !== plantId && l.type !== 'depot');
+      if(originType !== 'all'){
+        origins = origins.filter(o => o.type === originType);
+      }
+
+      // demo demand: ให้แต่ละจุดมี 10 ton cullet
+      const demandPerOriginTon = 10;
+
+      // เลือกรถที่ใช้ได้ตาม scenario
+      const ownTrucks = trucks.filter(t => t.ownerType === 'OWN');
+      const vendorTrucks = trucks.filter(t => t.ownerType === 'OUTSOURCE');
+
+      let htmlSummary = '';
+      let totalCost = 0;
+      let totalTon = 0;
+
+      origins.forEach((o, index) => {
+        const distanceKm = estimateDistanceKm(o.lat, o.lng, plant.lat, plant.lng);
+
+        // เลือกรถ
+        let chosen = null;
+        let mode = '';
+
+        const costOptions = [];
+
+        if(scenarioMode === 'mixed' || scenarioMode === 'own'){
+          ownTrucks.forEach(tr => {
+            const maxTon = tr.maxWeightKgLegal / 1000;
+            const trips = Math.ceil(demandPerOriginTon / maxTon);
+            const cost = trips * (tr.fixedCostPerTrip + tr.costPerKm * distanceKm * 2);
+            costOptions.push({mode:'own', truck:tr, cost, trips});
+          });
+        }
+
+        if(scenarioMode === 'mixed' || scenarioMode === 'vendor'){
+          vendorTrucks.forEach(tr => {
+            const trips = 1; // demo
+            let cost = 0;
+            if(tr.rateType === 'per_ton_km'){
+              cost = tr.rateValue * distanceKm * 2 * demandPerOriginTon;
+            } else if(tr.rateType === 'per_km'){
+              cost = tr.rateValue * distanceKm * 2;
+            }
+            if(tr.minCharge && cost < tr.minCharge) cost = tr.minCharge;
+            costOptions.push({mode:'vendor', truck:tr, cost, trips});
+          });
+        }
+
+        if(costOptions.length === 0) return;
+
+        costOptions.sort((a,b)=>a.cost-b.cost);
+        chosen = costOptions[0];
+        mode = chosen.mode;
+
+        totalCost += chosen.cost;
+        totalTon += demandPerOriginTon;
+
+        // วาดเส้น route จาก plant -> origin -> plant
+        const color = (mode === 'own')
+          ? Cesium.Color.fromBytes(22,143,58,200)
+          : Cesium.Color.fromBytes(214,39,40,220);
+
+        const entity = viewer.entities.add({
+          polyline: {
+            positions: Cesium.Cartesian3.fromDegreesArray([
+              plant.lng, plant.lat,
+              o.lng, o.lat,
+              plant.lng, plant.lat
+            ]),
+            width: 2,
+            material: color
+          }
+        });
+        routeEntities.push(entity);
+
+        htmlSummary += `
+          <div>
+            <b>${index+1}. ${o.name}</b><br/>
+            ระยะทางไป-กลับ ~ ${distanceKm.toFixed(1)} km x2,
+            ปริมาณ ${demandPerOriginTon} ton<br/>
+            เลือก: ${mode === 'own' ? 'รถบริษัท' : 'Outsource'}
+            (${chosen.truck.truckType}) |
+            Trips ~ ${chosen.trips || 1},
+            Cost ≈ ${chosen.cost.toFixed(0)} บาท
+          </div>
+        `;
+      });
+
+      if(totalTon > 0){
+        const costPerTon = totalCost / totalTon;
+        htmlSummary += `
+          <hr/>
+          <b>รวมทั้งแผน (Demo)</b><br/>
+          ปริมาณรวม ~ ${totalTon.toFixed(1)} ton<br/>
+          ต้นทุนรวม ~ ${totalCost.toFixed(0)} บาท<br/>
+          ต้นทุนเฉลี่ย ~ ${costPerTon.toFixed(0)} บาท/ton
+        `;
+      } else {
+        htmlSummary = 'ไม่เจอต้นทางที่ตรงกับเงื่อนไข';
+      }
+
+      document.getElementById('routeSummary').innerHTML = htmlSummary;
+    }
+
+    // ระยะทางเส้นตรงบนทรงกลม (demo; ของจริงควรใช้ routing engine)
+    function estimateDistanceKm(lat1, lon1, lat2, lon2){
+      const R = 6371;
+      const dLat = toRad(lat2-lat1);
+      const dLon = toRad(lon2-lon1);
+      const a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+                Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*
+                Math.sin(dLon/2)*Math.sin(dLon/2);
+      const c = 2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R*c;
+    }
+    function toRad(d){return d*Math.PI/180;}
+  </script>
+</body>
+</html>

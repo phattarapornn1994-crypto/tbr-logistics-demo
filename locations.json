@@ -1,0 +1,34 @@
+[
+  {
+    "locationId": "PLANT_01",
+    "name": "โรงงานหลอมแก้ว บางบาล",
+    "type": "plant",
+    "region": "ภาคกลาง",
+    "lat": 14.5035,
+    "lng": 100.4589
+  },
+  {
+    "locationId": "YARD_UBON_01",
+    "name": "ลานรับซื้ออุบล 1",
+    "type": "yard",
+    "region": "อีสาน",
+    "lat": 15.2285,
+    "lng": 104.8590
+  },
+  {
+    "locationId": "JS_UDON_01",
+    "name": "ร้านรับซื้อของเก่าอุดรธานี",
+    "type": "junkshop",
+    "region": "อีสาน",
+    "lat": 17.4138,
+    "lng": 102.7870
+  },
+  {
+    "locationId": "DEPOT_BKK_01",
+    "name": "ศูนย์จอดรถบริษัท กรุงเทพฯ",
+    "type": "depot",
+    "region": "ภาคกลาง",
+    "lat": 13.7932,
+    "lng": 100.5490
+  }
+]

@@ -264,9 +264,51 @@
 
     <!-- Panelsอื่น (Cost/Tracking/Reports) ไว้เติมทีหลัง -->
     <div class="section" data-panel="cost" style="display:none;">
-      <div style="font-size:11px;font-weight:600;">Cost View (Coming Next)</div>
-      <div class="hint">หน้านี้จะใช้แสดงภาพรวมต้นทุนต่อเส้นทาง / ลูกค้า / Vendor.</div>
-    </div>
+      <div style="font-size:11px;font-weight:600;">Truck Load Planner</div>
+      <div class="hint">
+        เลือกรถ 1 คัน และกำหนดปริมาณสินค้าหลายประเภท เพื่อดูว่าสามารถบรรทุกได้เท่าไหร่
+        เทียบกับน้ำหนักตามกฎหมายและความจุรถ
+      </div>
+
+  <label>เลือกรถบรรทุก</label>
+  <select id="loadTruckSelect">
+    <!-- จะเติมจาก initUI() -->
+  </select>
+
+  <div class="hint">แถวด้านล่าง: เลือกประเภทสินค้า และกำหนดน้ำหนักรวม (กก.) ต่อประเภท</div>
+
+  <div class="load-row" style="display:flex;gap:4px;align-items:center;margin-top:4px;">
+    <select class="load-material" style="flex:2;">
+      <option value="">- เลือกสินค้า -</option>
+    </select>
+    <input class="load-weight" type="number" min="0" step="50" placeholder="กก."
+      style="flex:1;">
+  </div>
+  <div class="load-row" style="display:flex;gap:4px;align-items:center;">
+    <select class="load-material" style="flex:2;">
+      <option value="">- เลือกสินค้า -</option>
+    </select>
+    <input class="load-weight" type="number" min="0" step="50" placeholder="กก."
+      style="flex:1;">
+  </div>
+  <div class="load-row" style="display:flex;gap:4px;align-items:center;">
+    <select class="load-material" style="flex:2;">
+      <option value="">- เลือกสินค้า -</option>
+    </select>
+    <input class="load-weight" type="number" min="0" step="50" placeholder="กก."
+      style="flex:1;">
+  </div>
+
+  <div id="loadResult" style="font-size:10px;margin-top:6px;border-top:1px dashed var(--border);padding-top:4px;">
+    รอเลือกชนิดสินค้าและน้ำหนัก...
+  </div>
+
+  <div class="hint">
+    น้ำหนักที่ใส่คือ "น้ำหนักรวม" (เช่น กระดาษอัดก้อน, PET, UBC, HDPE ฯลฯ)
+    ระบบคำนวณเปรียบเทียบกับน้ำหนักรถตามกฎหมาย และคาดการณ์ใช้ปริมาตรโดยอิงข้อมูลใน materials.json
+  </div>
+</div>
+    
     <div class="section" data-panel="tracking" style="display:none;">
       <div style="font-size:11px;font-weight:600;">Tracking View (Coming Next)</div>
       <div class="hint">รองรับ GPS / Shipment Status / Alert เมื่อดีเลย์.</div>
@@ -331,64 +373,94 @@
       if (el) el.innerHTML = 'โหลดไฟล์ไม่สำเร็จ: ' + err.message;
     });
 
-    function initUI(){
-      // top tabs (เตรียมไว้สำหรับ future panels)
-      document.querySelectorAll('.top-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-          document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          const view = tab.dataset.view;
-          document.querySelectorAll('[data-panel]').forEach(p => {
-            p.style.display = (p.dataset.panel === view || (view === 'planning' && p.dataset.panel === 'planning'))
-              ? 'flex'
-              : (p.dataset.panel === view ? 'flex' : 'none');
-          });
-          if (view === 'planning') {
-            document.querySelectorAll('[data-panel="planning"]').forEach(p => p.style.display = 'flex');
-          }
-        });
-      });
-
-      // plant
-      const plantSelect = document.getElementById('plantSelect');
-      if (plantSelect) {
-        locations.filter(l => l.type === 'plant').forEach(p => {
-          const opt = document.createElement('option');
-          opt.value = p.locationId;
-          opt.textContent = p.name;
-          plantSelect.appendChild(opt);
-        });
-        if (plantSelect.options.length > 0) {
-          plantSelect.selectedIndex = 0;
-        }
+function initUI(){
+  // --- top tabs: สลับ panel ---
+  function showPanels(view) {
+    document.querySelectorAll('[data-panel]').forEach(p => {
+      if (view === 'planning') {
+        p.style.display = (p.dataset.panel === 'planning') ? 'flex' : 'none';
+      } else {
+        p.style.display = (p.dataset.panel === view) ? 'flex' : 'none';
       }
+    });
+  }
+  
+  showPanels('planning');
+    document.querySelectorAll('.top-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const view = tab.dataset.view;
+      showPanels(view);
+    });
+  });
 
-      // scenario chips
-      const chips = document.querySelectorAll('#scenarioChips .chip');
-      chips.forEach(chip => {
-        chip.addEventListener('click', () => {
-          chips.forEach(c => c.classList.remove('active'));
-          chip.classList.add('active');
-          scenarioMode = chip.dataset.mode;
-        });
-      });
-
-      // buttons
-      const planBtn = document.getElementById('btnPlan');
-      if (planBtn) planBtn.addEventListener('click', buildPlanFromOrders);
-
-      const btnTest = document.getElementById('btnTestOptimize');
-      if (btnTest) btnTest.addEventListener('click', callOptimizeDemo);
-
-      const btnTariff = document.getElementById('btnTestTariff');
-      if (btnTariff) btnTariff.addEventListener('click', callTariffDemo);
+  // --- plant select ---
+  const plantSelect = document.getElementById('plantSelect');
+  if (plantSelect) {
+    locations.filter(l => l.type === 'plant').forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.locationId;
+      opt.textContent = p.name;
+      plantSelect.appendChild(opt);
+    });
+    if (plantSelect.options.length > 0) {
+      plantSelect.selectedIndex = 0;
     }
+  }
+
+    // --- scenario chips ---
+  const chips = document.querySelectorAll('#scenarioChips .chip');
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      scenarioMode = chip.dataset.mode;
+    });
+  });
+
+// --- ปุ่ม planning ---
+  const planBtn = document.getElementById('btnPlan');
+  if (planBtn) planBtn.addEventListener('click', buildPlanFromOrders);
+
+  const btnTest = document.getElementById('btnTestOptimize');
+  if (btnTest) btnTest.addEventListener('click', callOptimizeDemo);
+
+  const btnTariff = document.getElementById('btnTestTariff');
+  if (btnTariff) btnTariff.addEventListener('click', callTariffDemo);
 
     function flyToThailand(){
       viewer.camera.flyTo({
         destination: Cesium.Cartesian3.fromDegrees(100.5, 15.5, 2500000.0)
       });
     }
+
+  // --- event ของหน้าโหลดสินค้า (Cost tab) ---
+  const loadTruckSelect = document.getElementById('loadTruckSelect');
+  const loadRows = document.querySelectorAll('.load-row input, .load-row select');
+
+ if (loadTruckSelect) {
+    // เติมรายชื่อรถ
+    trucks.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id || t.truckId || t.displayName || t.truckType;
+      opt.textContent = (t.displayName || t.truckType || opt.value) +
+        (t.ownerType ? ` (${t.ownerType})` : '');
+      opt.dataset.maxWeightKgLegal = t.maxWeightKgLegal || (t.maxTon ? t.maxTon*1000 : '');
+      opt.dataset.maxVolumeM3 = t.maxVolumeM3 || '';
+    });
+    loadTruckSelect.selectedIndex = 0;
+    loadTruckSelect.addEventListener('change', updateLoadDashboard);
+  }
+
+    loadRows.forEach(el => {
+    el.addEventListener('input', updateLoadDashboard);
+    el.addEventListener('change', updateLoadDashboard);
+  });
+
+  // initial
+  updateLoadDashboard();
+}
 
     function plotLocations(){
       locations.forEach(loc => {
@@ -692,6 +764,115 @@
       return { ton:maxTon };
     }
 
+    // คำนวณการบรรทุกสินค้าหลายประเภทในรถ 1 คัน (หน้า Cost / Truck Load Planner)
+function updateLoadDashboard() {
+  const panel = document.querySelector('[data-panel="cost"]');
+  if (!panel) return;
+
+  const truckSelect = document.getElementById('loadTruckSelect');
+  const resultEl = document.getElementById('loadResult');
+  const materialSelects = panel.querySelectorAll('.load-material');
+  const weightInputs = panel.querySelectorAll('.load-weight');
+
+  // ถ้ายังไม่มี materials ใส่ใน dropdown ให้ใส่ตอนนี้
+  if (materialSelects.length && materials && materials.length) {
+    materialSelects.forEach(sel => {
+      if (sel.options.length <= 1) {
+        materials.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m.materialId || m.code || m.name;
+          opt.textContent = m.name || m.materialId || m.code;
+          opt.dataset.avgWeightPerUnitKg = m.avgWeightPerUnitKg || '';
+          opt.dataset.avgVolumePerUnitM3 = m.avgVolumePerUnitM3 || '';
+          sel.appendChild(opt);
+        });
+      }
+    });
+  }
+
+  if (!truckSelect || !resultEl) return;
+  const selectedIdx = truckSelect.selectedIndex;
+  if (selectedIdx < 0) {
+    resultEl.innerHTML = 'กรุณาเลือกรถ';
+    return;
+  }
+
+  // หา truck object จาก trucks
+  const selectedLabel = truckSelect.options[selectedIdx].textContent;
+  const truck = trucks.find(t =>
+    selectedLabel.includes(t.displayName || '') ||
+    selectedLabel.includes(t.truckType || '')
+  ) || trucks[0];
+
+  if (!truck) {
+    resultEl.innerHTML = 'ไม่พบข้อมูลรถ';
+    return;
+  }
+
+  const legalKg = truck.maxWeightKgLegal || (truck.maxTon ? truck.maxTon * 1000 : 0);
+  const capVol = truck.maxVolumeM3 || null;
+
+  let totalKg = 0;
+  let totalVol = 0;
+
+  // รวมแต่ละ material
+  materialSelects.forEach((sel, i) => {
+    const matId = sel.value;
+    const weightKg = parseFloat(weightInputs[i].value || '0');
+    if (!matId || !weightKg || weightKg <= 0) return;
+
+    const mat = materials.find(m =>
+      m.materialId === matId || m.code === matId || m.name === sel.options[sel.selectedIndex].textContent
+    );
+    totalKg += weightKg;
+
+    if (mat && mat.avgVolumePerUnitM3 && mat.avgWeightPerUnitKg) {
+      // คิดปริมาตรโดยประมาณจากสัดส่วนเดิมในไฟล์
+      const volPerKg = mat.avgVolumePerUnitM3 / mat.avgWeightPerUnitKg;
+      totalVol += weightKg * volPerKg;
+    }
+  });
+
+  if (totalKg === 0) {
+    resultEl.innerHTML = 'ระบุชนิดสินค้าและน้ำหนักรวม (กก.) เพื่อดูการใช้ความจุรถ';
+    return;
+  }
+
+  const utilWeight = legalKg ? (totalKg / legalKg) * 100 : null;
+  const utilVol = (capVol && totalVol)
+    ? (totalVol / capVol) * 100
+    : null;
+
+  let html = '';
+  html += `<b>ภาพรวมการบรรทุกของรถ: ${selectedLabel}</b><br/>`;
+  html += `น้ำหนักรวมสินค้า: ${totalKg.toLocaleString()} กก.<br/>`;
+  if (legalKg) {
+    html += `ความสามารถตามกฎหมาย: ${legalKg.toLocaleString()} กก.<br/>`;
+    html += `ใช้ตามน้ำหนัก ≈ ${utilWeight.toFixed(1)}%<br/>`;
+  } else {
+    html += `ไม่มีข้อมูลน้ำหนักตามกฎหมายของรถ (maxWeightKgLegal) ใน trucks.json<br/>`;
+  }
+
+  if (capVol && totalVol) {
+    html += `ปริมาตรโดยประมาณ: ${totalVol.toFixed(2)} m³ / ความจุ ${capVol} m³ `
+      + `(${utilVol.toFixed(1)}%)<br/>`;
+  }
+
+  // เตือนกรณีเกิน
+  if (utilWeight && utilWeight > 100) {
+    html += `<span style="color:#d62728;font-weight:600;">เกินน้ำหนักตามกฎหมาย! กรุณาลดน้ำหนักลง</span><br/>`;
+  } else if (utilWeight && utilWeight > 85) {
+    html += `<span style="color:#168f3a;">ใกล้เต็มน้ำหนักตามกฎหมาย ใช้รถได้คุ้มค่า</span><br/>`;
+  }
+
+  if (utilVol && utilVol > 100) {
+    html += `<span style="color:#d62728;">ปริมาตรสินค้าคำนวณเกินความจุรถ (อาจอัดไม่พอ)</span><br/>`;
+  }
+
+  resultEl.innerHTML = html;
+}
+
+    
     function focusRoute(routeId){
       routeEntities.forEach(r => {
         if (r.id === routeId) {
@@ -864,4 +1045,5 @@
   </script>
 </body>
 </html>
+
 

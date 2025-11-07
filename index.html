@@ -597,9 +597,92 @@ const url =
     }
   }
 }
+  // ===== ทดสอบเรียก /tariff/calc =====
+async function callTariffDemo() {
+  const summaryEl = document.getElementById('routeSummary');
+  if (!summaryEl) return;
+
+  const demandInput = document.getElementById('optDemand');
+  const distanceInput = document.getElementById('optDistance');
+
+  const weightTon = demandInput && demandInput.value
+    ? parseFloat(demandInput.value)
+    : 8;
+
+  const distanceKm = distanceInput && distanceInput.value
+    ? parseFloat(distanceInput.value)
+    : 250;
+
+  // เดโม่: origin/destination สมมุติ
+  const origin = 'DC_BKK';
+  const destination = 'STORE_A';
+
+  // map scenarioMode → ประเภทผู้ให้บริการ
+  let vendorType = 'OWN';
+  if (scenarioMode === 'vendor') vendorType = 'SUB';
+  if (scenarioMode === 'mixed') vendorType = 'OWN'; // เดโม่ให้ OWN ก่อน
+
+  const vehicleType = '6W';
+  const stops = 3;
+
+  const url =
+    `/tariff/calc`
+    + `?origin=${encodeURIComponent(origin)}`
+    + `&destination=${encodeURIComponent(destination)}`
+    + `&distanceKm=${encodeURIComponent(distanceKm)}`
+    + `&weightTon=${encodeURIComponent(weightTon)}`
+    + `&stops=${encodeURIComponent(stops)}`
+    + `&vehicleType=${encodeURIComponent(vehicleType)}`
+    + `&vendorType=${encodeURIComponent(vendorType)}`;
+
+  summaryEl.innerHTML = 'กำลังเรียก ' + url + ' ...';
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok) {
+      summaryEl.innerHTML = 'Error: ' + (data.message || res.status);
+      return;
+    }
+
+    const b = data.breakdown;
+    const m = data.meta;
+
+    const lines = [];
+    lines.push('<b>ผลคำนวณค่าขนส่ง (Tariff Demo)</b>');
+    lines.push(
+      `OD: ${data.input.origin} → ${data.input.destination}, `
+      + `${data.input.distanceKm} km, `
+      + `${data.input.weightTon} ton`
+    );
+    lines.push(
+      `Vehicle: ${data.input.vehicleType}, Vendor: ${data.input.vendorType}`
+    );
+    lines.push(`Base Freight: ${b.baseFreight.toLocaleString()} บาท`);
+    lines.push(`Extra Stops: ${b.extraStopCharge.toLocaleString()} บาท`);
+    lines.push(
+      `Fuel Cost (@${m.fuelPrice} บ./ลิตร): `
+      + `${b.fuelCost.toLocaleString()} บาท`
+    );
+    lines.push(`<b>Total: ${b.total.toLocaleString()} บาท</b>`);
+    if (m.remark && m.remark.length) {
+      lines.push(
+        `<span style="font-size:9px;color:#888;">${m.remark.join(' | ')}</span>`
+      );
+    }
+
+    summaryEl.innerHTML = lines.join('<br/>');
+  } catch (err) {
+    console.error(err);
+    summaryEl.innerHTML = 'เรียก /tariff/calc ไม่สำเร็จ: ' + err.message;
+  }
+}
+
 </script>    
 </body>
 </html>
+
 
 
 

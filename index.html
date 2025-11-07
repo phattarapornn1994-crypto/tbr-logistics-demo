@@ -264,10 +264,14 @@
       planBtn.addEventListener('click', buildPlanFromOrders);
     }
 
-    const btnTest = document.getElementById('btnTestOptimize');
-    if (btnTest) {
-      btnTest.addEventListener('click', callOptimizeDemo);
-    }
+  const btnTest = document.getElementById('btnTestOptimize');
+  if (btnTest) {
+    btnTest.addEventListener('click', callOptimizeDemo);
+  }
+
+  const btnTariff = document.getElementById('btnTestTariff');
+  if (btnTariff) {
+    btnTariff.addEventListener('click', callTariffDemo);
   }
 
   function flyToThailand(){
@@ -594,6 +598,7 @@ const url =
 </script>    
 </body>
 </html>
+
 
 
 

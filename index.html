@@ -444,8 +444,7 @@ function initUI(){
   const loadTruckSelect = document.getElementById('loadTruckSelect');
   const loadRows = document.querySelectorAll('.load-row input, .load-row select');
 
- if (loadTruckSelect) {
-    // เติมรายชื่อรถ
+  if (loadTruckSelect) {
     trucks.forEach(t => {
       const opt = document.createElement('option');
       opt.value = t.id || t.truckId || t.displayName || t.truckType;
@@ -453,6 +452,7 @@ function initUI(){
         (t.ownerType ? ` (${t.ownerType})` : '');
       opt.dataset.maxWeightKgLegal = t.maxWeightKgLegal || (t.maxTon ? t.maxTon*1000 : '');
       opt.dataset.maxVolumeM3 = t.maxVolumeM3 || '';
+      loadTruckSelect.appendChild(opt);   // 👈 ใส่บรรทัดนี้
     });
     loadTruckSelect.selectedIndex = 0;
     loadTruckSelect.addEventListener('change', updateLoadDashboard);
@@ -1203,6 +1203,7 @@ function updateLoadDashboard() {
   </script>
 </body>
 </html>
+
 
 
 

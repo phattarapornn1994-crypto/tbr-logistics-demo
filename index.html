@@ -431,6 +431,13 @@ function initUI(){
         });
 
 const routeId = 'R' + routeIndex;
+const modeLabel = chosen.mode === 'own' ? 'รถบริษัท' : 'Outsource';
+const truckLabel = chosen.truck.displayName || chosen.truck.vendorName || chosen.truck.truckType || chosen.truck.id;
+const loadPct = (chosen.ton * 1000) / (chosen.truck.maxWeightKgLegal || chosen.truck.maxTon * 1000) * 100;
+const etaHours = (distanceKm * 2) / 60; // สมมติ 60 km/h
+const departTime = "08:00";
+const arrivalTime = addHoursToTime(departTime, etaHours);
+        
 routeEntities.push({
   id: routeId,
   entity,
@@ -777,6 +784,7 @@ async function callTariffDemo() {
 </script>    
 </body>
 </html>
+
 
 
 

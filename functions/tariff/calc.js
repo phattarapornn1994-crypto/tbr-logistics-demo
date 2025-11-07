@@ -56,6 +56,13 @@ export async function onRequestGet(context) {
       minCharge: 4000
     },
     {
+      vehicleType: "6W",
+      vendorType: "SUB",
+      rateType: "per_ton_km",
+      rateValue: 1.6,
+      minCharge: 4000
+    },
+    {
       vehicleType: "10W",
       vendorType: "SUB",
       rateType: "per_ton_km",

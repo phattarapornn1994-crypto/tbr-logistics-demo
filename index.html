@@ -609,26 +609,38 @@ async function callTariffDemo() {
     ? parseFloat(demandInput.value)
     : 8;
 
-  const distanceKm = distanceInput && distanceInput.value
+  const distanceKmInput = distanceInput && distanceInput.value
     ? parseFloat(distanceInput.value)
     : 250;
 
-  // เดโม่: origin/destination สมมุติ
-  const origin = 'DC_BKK';
-  const destination = 'STORE_A';
+  // ใช้ plant ที่เลือกเป็นปลายทาง
+  const plantSelect = document.getElementById('plantSelect');
+  const plantId = plantSelect ? plantSelect.value : null;
+  const plant = locations.find(l => l.locationId === plantId && l.type === 'plant');
 
-  // map scenarioMode → ประเภทผู้ให้บริการ
+  // เอา origin ตัวอย่าง: จุดแรกที่เป็นลานหรือร้าน
+  const origin = locations.find(l => l.type === 'yard' || l.type === 'junkshop');
+
+  if (!plant || !origin) {
+    summaryEl.innerHTML = 'ยังไม่มีข้อมูล Plant หรือ Origin ที่ใช้ทดสอบ Tariff';
+    return;
+  }
+
+  // คำนวณระยะจริงจาก lat/lng ถ้าไม่กรอกเอง
+  const distanceKm = distanceKmInput || estimateDistanceKm(origin.lat, origin.lng, plant.lat, plant.lng) * 2;
+
+  // map scenario → vendorType
   let vendorType = 'OWN';
   if (scenarioMode === 'vendor') vendorType = 'SUB';
-  if (scenarioMode === 'mixed') vendorType = 'OWN'; // เดโม่ให้ OWN ก่อน
+  if (scenarioMode === 'mixed') vendorType = 'OWN';
 
   const vehicleType = '6W';
   const stops = 3;
 
   const url =
     `/tariff/calc`
-    + `?origin=${encodeURIComponent(origin)}`
-    + `&destination=${encodeURIComponent(destination)}`
+    + `?origin=${encodeURIComponent(origin.locationId)}`
+    + `&destination=${encodeURIComponent(plant.locationId)}`
     + `&distanceKm=${encodeURIComponent(distanceKm)}`
     + `&weightTon=${encodeURIComponent(weightTon)}`
     + `&stops=${encodeURIComponent(stops)}`
@@ -652,9 +664,8 @@ async function callTariffDemo() {
     const lines = [];
     lines.push('<b>ผลคำนวณค่าขนส่ง (Tariff Demo)</b>');
     lines.push(
-      `OD: ${data.input.origin} → ${data.input.destination}, `
-      + `${data.input.distanceKm} km, `
-      + `${data.input.weightTon} ton`
+      `จาก ${origin.name} → ${plant.name} `
+      + `(${data.input.distanceKm} km, ${data.input.weightTon} ton)`
     );
     lines.push(
       `Vehicle: ${data.input.vehicleType}, Vendor: ${data.input.vendorType}`
@@ -662,8 +673,7 @@ async function callTariffDemo() {
     lines.push(`Base Freight: ${b.baseFreight.toLocaleString()} บาท`);
     lines.push(`Extra Stops: ${b.extraStopCharge.toLocaleString()} บาท`);
     lines.push(
-      `Fuel Cost (@${m.fuelPrice} บ./ลิตร): `
-      + `${b.fuelCost.toLocaleString()} บาท`
+      `Fuel Cost (@${m.fuelPrice} บ./ลิตร): ${b.fuelCost.toLocaleString()} บาท`
     );
     lines.push(`<b>Total: ${b.total.toLocaleString()} บาท</b>`);
     if (m.remark && m.remark.length) {
@@ -679,9 +689,11 @@ async function callTariffDemo() {
   }
 }
 
+
 </script>    
 </body>
 </html>
+
 
 
 

@@ -520,22 +520,43 @@ function initUI(){
         return;
       }
 
-      const demandByOrigin = {};
-      (orders || []).forEach(order => {
-        const origin = locations.find(l => l.locationId === order.originLocationId);
-        if (!origin) return;
-        if (originTypeFilter !== 'all' && origin.type !== originTypeFilter) return;
-        if (!demandByOrigin[origin.locationId]) {
-          demandByOrigin[origin.locationId] = { weightKg: 0, volumeM3: 0, origin };
-        }
-        (order.lines || []).forEach(line => {
-          const mat = materials.find(m => m.materialId === line.materialId);
-          if (!mat) return;
-          demandByOrigin[origin.locationId].weightKg += (mat.avgWeightPerUnitKg || 0) * line.qtyUnit;
-          demandByOrigin[origin.locationId].volumeM3 += (mat.avgVolumePerUnitM3 || 0) * line.qtyUnit;
-        });
-      });
+const demandByOrigin = {};
+(orders || []).forEach(order => {
+  const origin = locations.find(l => l.locationId === order.originLocationId);
+  if (!origin) return;
+  if (originTypeFilter !== 'all' && origin.type !== originTypeFilter) return;
 
+  if (!demandByOrigin[origin.locationId]) {
+    demandByOrigin[origin.locationId] = {
+      weightKg: 0,
+      volumeM3: 0,
+      origin,
+      byMaterial: {}
+    };
+  }
+  const d = demandByOrigin[origin.locationId];
+
+  (order.lines || []).forEach(line => {
+    const mat = materials.find(m => m.materialId === line.materialId);
+    if (!mat) return;
+
+    const w = (mat.avgWeightPerUnitKg || 0) * line.qtyUnit;
+    const v = (mat.avgVolumePerUnitM3 || 0) * line.qtyUnit;
+    d.weightKg += w;
+    d.volumeM3 += v;
+
+    const mid = mat.materialId || mat.code || mat.name;
+    if (!d.byMaterial[mid]) {
+      d.byMaterial[mid] = {
+        material: mat,
+        weightKg: 0,
+        volumeM3: 0
+      };
+    }
+    d.byMaterial[mid].weightKg += w;
+    d.byMaterial[mid].volumeM3 += v;
+  });
+});
       const originIds = Object.keys(demandByOrigin);
       if (originIds.length === 0) {
         if (summaryEl) summaryEl.innerHTML = 'ไม่มี orders ตรงกับ filter หรือยังไม่มี orders.json';
@@ -558,6 +579,16 @@ function initUI(){
         if (remainingKg <= 0 || remainingVol <= 0) return;
 
         const distanceKm = estimateDistanceKm(origin.lat, origin.lng, plant.lat, plant.lng);
+
+        const byMat = d.byMaterial || {};
+const remainingByMat = {};
+Object.keys(byMat).forEach(mid => {
+  remainingByMat[mid] = {
+    material: byMat[mid].material,
+    weightKg: byMat[mid].weightKg,
+    volumeM3: byMat[mid].volumeM3
+  };
+});
 
         while (remainingKg > 50) {
           const candidates = [];
@@ -600,6 +631,48 @@ function initUI(){
           const usedVol = (chosen.ton * 1000) / density;
           remainingVol -= usedVol;
 
+          // ปริมาณที่เที่ยวนี้จะขน (kg)
+const assignKg = chosen.ton * 1000;
+
+// กระจาย assignKg ตามสัดส่วน material ที่ยังเหลือ
+const routeMat = {};
+let assignedKg = 0;
+let assignedVol = 0;
+
+// น้ำหนักรวมที่ยังเหลือ ณ ตอนนี้ (ใช้จาก remainingByMat)
+const totalRemainKg = Object.values(remainingByMat)
+  .reduce((s, m) => s + (m.weightKg || 0), 0) || 1;
+
+Object.keys(remainingByMat).forEach(mid => {
+  const rm = remainingByMat[mid];
+  if (rm.weightKg <= 0) return;
+
+  const ratio = rm.weightKg / totalRemainKg;
+  let w = assignKg * ratio;
+  if (w > rm.weightKg) w = rm.weightKg;
+  if (w <= 0) return;
+
+  const volPerKg = (rm.volumeM3 && rm.weightKg) ? (rm.volumeM3 / rm.weightKg) : 0;
+  const v = volPerKg ? w * volPerKg : 0;
+
+  rm.weightKg -= w;
+  if (rm.volumeM3) rm.volumeM3 = Math.max(0, rm.volumeM3 - v);
+
+  assignedKg += w;
+  assignedVol += v;
+
+  if (!routeMat[mid]) {
+    routeMat[mid] = { material: rm.material, weightKg: 0, volumeM3: 0 };
+  }
+  routeMat[mid].weightKg += w;
+  routeMat[mid].volumeM3 += v;
+});
+
+// อัปเดตยอดรวมที่เหลือสำหรับ origin นี้
+remainingKg = Math.max(0, remainingKg - assignedKg);
+remainingVol = Math.max(0, remainingVol - assignedVol);
+
+          
           const color = (chosen.mode === 'own')
             ? Cesium.Color.fromBytes(22,143,58,230)
             : Cesium.Color.fromBytes(214,39,40,230);
@@ -616,16 +689,17 @@ function initUI(){
             }
           });
 
-          const routeId = 'R' + routeIndex;
-          routeEntities.push({
-            id: routeId,
-            entity,
-            mode: chosen.mode,
-            originId: origin.locationId,
-            plantId: plant.locationId,
-            ton: chosen.ton,
-            distanceKm: distanceKm * 2
-          });
+const routeId = 'R' + routeIndex;
+routeEntities.push({
+  id: routeId,
+  entity,
+  mode: chosen.mode,
+  originId: origin.locationId,
+  plantId: plant.locationId,
+  ton: chosen.ton,
+  distanceKm: distanceKm * 2,
+  materials: routeMat
+});
 
           const modeLabel = chosen.mode === 'own' ? 'รถบริษัท' : 'Outsource';
           const truckLabel = chosen.truck.displayName || chosen.truck.vendorName || chosen.truck.truckType || chosen.truck.id;
@@ -634,16 +708,27 @@ function initUI(){
           const departTime = "08:00";
           const arrivalTime = addHoursToTime(departTime, etaHours);
 
-          routeHtml += `
-            <div class="route-row ${chosen.mode === 'own' ? 'own':'vendor'}" data-route-id="${routeId}">
-              <b>Route ${routeIndex}:</b> ${origin.name} → ${plant.name}<br/>
-              ${modeLabel} (${truckLabel}) |
-              Load ~ ${chosen.ton.toFixed(2)} ton (${loadPct.toFixed(0)}% กฎหมาย)<br/>
-              Dist ~ ${(distanceKm*2).toFixed(1)} km |
-              Cost ≈ ${chosen.cost.toFixed(0)} บาท<br/>
-              เวลาออก ${departTime} ~ ถึงประมาณ ${arrivalTime}
-            </div>
-          `;
+          const matList = Object.values(routeMat)
+  .filter(m => m.weightKg > 0)
+  .sort((a, b) => b.weightKg - a.weightKg)
+  .slice(0, 3)
+  .map(m => {
+    const name = m.material.name || m.material.materialId || 'Material';
+    return `${name}: ${(m.weightKg/1000).toFixed(2)}t`;
+  })
+  .join(', ');
+
+routeHtml += `
+  <div class="route-row ${chosen.mode === 'own' ? 'own':'vendor'}" data-route-id="${routeId}">
+    <b>Route ${routeIndex}:</b> ${origin.name} → ${plant.name}<br/>
+    ${modeLabel} (${truckLabel}) |
+    Load ~ ${chosen.ton.toFixed(2)} ton (${loadPct.toFixed(0)}% กฎหมาย)<br/>
+    Dist ~ ${(distanceKm*2).toFixed(1)} km |
+    Cost ≈ ${chosen.cost.toFixed(0)} บาท<br/>
+    ${matList ? `สินค้าหลัก: ${matList}<br/>` : ''}
+    เวลาออก ${departTime} ~ ถึงประมาณ ${arrivalTime}
+  </div>
+`;
 
           totalCost += chosen.cost;
           totalTon += chosen.ton;
@@ -671,12 +756,80 @@ function initUI(){
 
       if (summaryEl) summaryEl.innerHTML = routeHtml;
 
-      document.querySelectorAll('.route-row').forEach(row => {
-        row.addEventListener('click', () => {
-          const id = row.getAttribute('data-route-id');
-          focusRoute(id);
-        });
-      });
+document.querySelectorAll('.route-row').forEach(row => {
+  row.addEventListener('click', () => {
+    const id = row.getAttribute('data-route-id');
+    focusRoute(id);
+    prefillLoadFromRoute(id); // 👈 เพิ่มบรรทัดนี้
+  });
+});
+
+      function prefillLoadFromRoute(routeId) {
+  const route = routeEntities.find(r => r.id === routeId);
+  if (!route || !route.materials) return;
+
+  // สลับไปแท็บ Cost (Truck Load Planner)
+  const tabCost = document.querySelector('.top-tab[data-view="cost"]');
+  if (tabCost) tabCost.click();
+
+  const panel = document.querySelector('[data-panel="cost"]');
+  if (!panel) return;
+
+  const truckSelect = document.getElementById('loadTruckSelect');
+  const materialSelects = panel.querySelectorAll('.load-material');
+  const weightInputs = panel.querySelectorAll('.load-weight');
+
+  // เลือกประเภทเจ้าของรถตาม route (own / vendor)
+  if (truckSelect && trucks && trucks.length) {
+    const owner = route.mode === 'own' ? 'OWN' : 'OUTSOURCE';
+    let foundIndex = 0;
+    trucks.forEach((t, i) => {
+      if ((t.ownerType || '').toUpperCase() === owner && foundIndex === 0) {
+        foundIndex = i;
+      }
+    });
+    if (truckSelect.options[foundIndex]) {
+      truckSelect.selectedIndex = foundIndex;
+    }
+  }
+
+  // เติมสินค้าจาก route ลง 3 แถวแรก
+  const mats = Object.values(route.materials)
+    .filter(m => m.weightKg > 0)
+    .sort((a, b) => b.weightKg - a.weightKg);
+
+  materialSelects.forEach((sel, i) => {
+    const input = weightInputs[i];
+    if (!sel || !input) return;
+
+    if (i < mats.length) {
+      const mat = mats[i].material;
+      const targetId = mat.materialId || mat.code || mat.name;
+
+      // หา option ที่ตรงกับ material
+      let set = false;
+      for (let o = 0; o < sel.options.length; o++) {
+        if (
+          sel.options[o].value === targetId ||
+          sel.options[o].textContent === (mat.name || targetId)
+        ) {
+          sel.selectedIndex = o;
+          set = true;
+          break;
+        }
+      }
+      if (!set) sel.selectedIndex = 0;
+
+      input.value = Math.round(mats[i].weightKg); // kg
+    } else {
+      sel.selectedIndex = 0;
+      input.value = '';
+    }
+  });
+
+  updateLoadDashboard();
+}
+
 
       // เติม Tariff จาก API
       enrichRoutesWithTariff();
@@ -1050,6 +1203,7 @@ function updateLoadDashboard() {
   </script>
 </body>
 </html>
+
 
 
 

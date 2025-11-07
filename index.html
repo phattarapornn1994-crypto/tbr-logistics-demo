@@ -309,10 +309,17 @@
   </div>
 </div>
     
-    <div class="section" data-panel="tracking" style="display:none;">
-      <div style="font-size:11px;font-weight:600;">Tracking View (Coming Next)</div>
-      <div class="hint">รองรับ GPS / Shipment Status / Alert เมื่อดีเลย์.</div>
-    </div>
+<div class="section" data-panel="tracking" style="display:none;">
+  <div style="font-size:11px;font-weight:600;">Shipment Timeline (Mock Tracking)</div>
+  <div class="hint">
+    ระบบสร้าง Shipment จากแผน Route ที่คำนวณได้:
+    แสดงเวลาออก, ETA, สถานะ, และเตือนล่าช้า (จำลอง)
+  </div>
+  <div id="trackingList" style="font-size:10px;margin-top:4px;max-height:260px;overflow-y:auto;border-top:1px dashed var(--border);padding-top:4px;">
+    ยังไม่มีแผนขนส่ง กรุณาคำนวณแผนจากแท็บ Planning ก่อน
+  </div>
+</div>
+    
     <div class="section" data-panel="reports" style="display:none;">
       <div style="font-size:11px;font-weight:600;">Reports View (Coming Next)</div>
       <div class="hint">Dashboard KPI ขนส่ง / Load Factor / Cost per Ton / SLA.</div>
@@ -833,8 +840,57 @@ document.querySelectorAll('.route-row').forEach(row => {
 
       // เติม Tariff จาก API
       enrichRoutesWithTariff();
+      generateTrackingFromRoutes();
     }
 
+    function generateTrackingFromRoutes() {
+  const box = document.getElementById('trackingList');
+  if (!box) return;
+
+  if (!routeEntities.length) {
+    box.innerHTML = 'ยังไม่มี Route โปรดคำนวณแผนจากแท็บ Planning ก่อน';
+    return;
+  }
+
+  let html = '';
+  const baseDate = '2025-11-07'; // mock: วันนี้ (ไว้เปลี่ยนเป็น dynamic ได้)
+
+  routeEntities.forEach((r, idx) => {
+    // mock ข้อมูลจาก routeEntities
+    const origin = locations.find(l => l.locationId === r.originId);
+    const plant = locations.find(l => l.locationId === r.plantId);
+    const departTime = `0${8 + (idx % 3)}:00`.slice(-5); // 08:00,09:00,10:00
+    const etaHours = (r.distanceKm || 200) / 60; // 60km/h
+    const eta = addHoursToTime(departTime, etaHours);
+
+    // mock GPS/Status
+    // idx บางอันให้ตรงเวลา บางอันดีเลย์
+    let status = 'กำลังขนส่ง';
+    let alert = '';
+    if (idx % 3 === 1) {
+      status = 'ส่งถึงแล้ว';
+    } else if (idx % 3 === 2) {
+      status = 'ล่าช้ากว่าแผน';
+      alert = '⚠ คาดการณ์ถึงช้ากว่า ETA ~30 นาที';
+    }
+
+    html += `
+      <div style="margin-bottom:6px;padding:4px;border-radius:6px;border:1px solid ${status.includes('ล่าช้า') ? '#ffb3b3':'#d6e4da'};background:#fff;">
+        <b>Shipment ${idx+1} (${r.id})</b><br/>
+        จาก: ${origin ? origin.name : r.originId} → ${plant ? plant.name : r.plantId}<br/>
+        โหลด: ~ ${r.ton.toFixed(2)} ton | Mode: ${r.mode === 'own' ? 'รถบริษัท' : 'Outsource'}<br/>
+        Plan: ออก ${departTime} | ETA ${eta}<br/>
+        สถานะ: <span style="color:${status.includes('ล่าช้า') ? '#d62728' : (status.includes('ส่งถึงแล้ว') ? '#168f3a' : '#444')}">${status}</span><br/>
+        ${alert ? `<span style="font-size:9px;color:#d62728;">${alert}</span><br/>` : ''}
+        <span style="font-size:8px;color:#888;">(Mock Tracking: สามารถต่อกับ GPS/IoT จริงทีหลังได้)</span>
+      </div>
+    `;
+  });
+
+  box.innerHTML = html;
+}
+
+    
     // เติม Tariff ให้แต่ละ Route
     async function enrichRoutesWithTariff() {
       const summaryEl = document.getElementById('routeSummary');
@@ -1203,6 +1259,7 @@ function updateLoadDashboard() {
   </script>
 </body>
 </html>
+
 
 
 

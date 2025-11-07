@@ -149,6 +149,19 @@
 
       <button id="btnPlan">คำนวณแผนจาก Orders.json</button>
       <button id="btnTestOptimize" style="margin-top:4px; background:#444;">
+      <div style="margin-top:4px; font-size:9px; color:#555;">
+        ทดสอบปรับพารามิเตอร์:
+      </div>
+        <label style="font-size:9px;">ปริมาณรวม (ตัน)</label>
+        <input id="optDemand" type="number" step="0.1" value="12"
+          style="width:100%;padding:4px 6px;font-size:9px;border-radius:6px;border:1px solid #d6e4da;">
+        <label style="font-size:9px;">ระยะทางไป-กลับ (กม.)</label>
+        <input id="optDistance" type="number" step="10" value="300"
+          style="width:100%;padding:4px 6px;font-size:9px;border-radius:6px;border:1px solid #d6e4da;">
+        <div style="font-size:8px;color:#888;margin-top:2px;">
+        ระบบจะใช้ Scenario ที่เลือกด้านบน (Mixed / Own / Outsource) ในการเปรียบเทียบต้นทุน
+        </div>
+
         ทดสอบเรียก Optimize API (Cloudflare)
       </button>
 
@@ -490,40 +503,83 @@
   }
   function toRad(d){ return d*Math.PI/180; }
 
-  // เรียก /optimize จาก Cloudflare แล้วเอาผลมาแสดงใน routeSummary
-  async function callOptimizeDemo() {
-    const summaryEl = document.getElementById('routeSummary');
-    if (summaryEl) {
-      summaryEl.innerHTML = 'กำลังเรียก /optimize จาก Cloudflare ...';
+// เรียก /optimize จาก Cloudflare โดยใช้ค่าจากหน้าเว็บ
+async function callOptimizeDemo() {
+  const summaryEl = document.getElementById('routeSummary');
+
+  // อ่านค่าจาก input
+  const demandInput = document.getElementById('optDemand');
+  const distanceInput = document.getElementById('optDistance');
+
+  const demandTon = demandInput && demandInput.value
+    ? parseFloat(demandInput.value)
+    : 12;
+  const distanceKm = distanceInput && distanceInput.value
+    ? parseFloat(distanceInput.value)
+    : 300;
+
+  // ใช้ scenarioMode จากปุ่ม chips (mixed / own / vendor)
+  const scenario = scenarioMode || 'mixed';
+
+  if (summaryEl) {
+    summaryEl.innerHTML =
+      `กำลังเรียก /optimize?demandTon=${demandTon}&distanceKm=${distanceKm}&scenario=${scenario} ...`;
+  }
+
+  try {
+    const url =
+      `/optimize?demandTon=${encodeURIComponent(demandTon)}`
+      + `&distanceKm=${encodeURIComponent(distanceKm)}`
+      + `&scenario=${encodeURIComponent(scenario)}`;
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status);
     }
-    try {
-      const res = await fetch('/optimize');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const best = data.best;
-      const lines = [];
-      lines.push('<b>ผลจาก /optimize (เดโม่)</b>');
-      lines.push(`ต้องขน: ${data.demandTon} ton, ระยะทาง: ${data.distanceKm} km`);
-      (data.options || []).forEach((opt, i) => {
-        lines.push(
-          `ตัวเลือก ${i+1}: ${opt.mode} (${opt.truckId}) - Trips: ${opt.trips}, `
-          + `Cost: ${opt.totalCost.toFixed(0)} บาท (${opt.costPerTon.toFixed(0)} บาท/ton)`
-        );
-      });
-      if (best) {
-        lines.push(
-          `<span style="color:#168f3a;"><b>แนะนำ:</b> ${best.mode} (${best.truckId}), `
-          + `${best.totalCost.toFixed(0)} บาท (${best.costPerTon.toFixed(0)} บาท/ton)</span>`
-        );
-      }
-      if (summaryEl) summaryEl.innerHTML = lines.join('<br/>');
-    } catch (err) {
-      console.error(err);
-      if (summaryEl) summaryEl.innerHTML = 'เรียก /optimize ไม่สำเร็จ: ' + err.message;
+
+    const data = await res.json();
+    const best = data.best;
+    const opts = data.options || [];
+
+    const lines = [];
+    lines.push('<b>ผลจาก /optimize (Cloudflare Functions)</b>');
+    lines.push(
+      `Input: ${data.input.demandTon} ton, `
+      + `${data.input.distanceKm} km, `
+      + `Scenario: ${data.input.scenario}`
+    );
+
+    opts.forEach((opt, i) => {
+      lines.push(
+        `ตัวเลือก ${i+1}: ${opt.mode} - ${opt.truckLabel || opt.truckId}, `
+        + `Trips: ${opt.trips}, `
+        + `Cost: ${opt.totalCost.toFixed(0)} บาท `
+        + `(${opt.costPerTon.toFixed(0)} บาท/ton)`
+      );
+    });
+
+    if (best) {
+      lines.push(
+        `<span style="color:#168f3a;"><b>แนะนำ:</b> `
+        + `${best.mode} - ${best.truckLabel || best.truckId}, `
+        + `${best.totalCost.toFixed(0)} บาท `
+        + `(${best.costPerTon.toFixed(0)} บาท/ton)</span>`
+      );
+    }
+
+    if (summaryEl) {
+      summaryEl.innerHTML = lines.join('<br/>');
+    }
+  } catch (err) {
+    console.error(err);
+    if (summaryEl) {
+      summaryEl.innerHTML = 'เรียก /optimize ไม่สำเร็จ: ' + err.message;
     }
   }
+}
 </script>    
 </body>
 </html>
+
 
 

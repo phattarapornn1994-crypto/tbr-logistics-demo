@@ -226,6 +226,18 @@
   let scenarioMode = 'mixed';
   let routeEntities = [];
 
+   // ให้คลิกที่เส้น Route บนแผนที่ แล้วโฟกัสเส้นนั้น
+  const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+  handler.setInputAction(function(click) {
+    const picked = viewer.scene.pick(click.position);
+    if (picked && picked.id) {
+      const match = routeEntities.find(r => r.entity === picked.id);
+      if (match) {
+        focusRoute(match.id);
+      }
+    }
+  }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+    
   // โหลด master + orders (ถ้าไม่มี orders.json จะใช้ [] แทน)
   Promise.all([
     fetch('locations.json').then(r => r.json()),
@@ -800,6 +812,7 @@ document.querySelectorAll('#mainMenu .chip').forEach(chip => {
 </script>    
 </body>
 </html>
+
 
 
 

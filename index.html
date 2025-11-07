@@ -236,33 +236,33 @@
     if (el) el.innerHTML = 'โหลดไฟล์ไม่สำเร็จ: ' + err.message;
   });
 
-  function initUI(){
-    const plantSelect = document.getElementById('plantSelect');
-    if (plantSelect) {
-      locations.filter(l => l.type === 'plant').forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.locationId;
-        opt.textContent = p.name;
-        plantSelect.appendChild(opt);
-      });
-      if (plantSelect.options.length > 0) {
-        plantSelect.selectedIndex = 0;
-      }
-    }
-
-    const chips = document.querySelectorAll('#scenarioChips .chip');
-    chips.forEach(chip => {
-      chip.addEventListener('click', () => {
-        chips.forEach(c => c.classList.remove('active'));
-        chip.classList.add('active');
-        scenarioMode = chip.dataset.mode;
-      });
+function initUI(){
+  const plantSelect = document.getElementById('plantSelect');
+  if (plantSelect) {
+    locations.filter(l => l.type === 'plant').forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.locationId;
+      opt.textContent = p.name;
+      plantSelect.appendChild(opt);
     });
-
-    const planBtn = document.getElementById('btnPlan');
-    if (planBtn) {
-      planBtn.addEventListener('click', buildPlanFromOrders);
+    if (plantSelect.options.length > 0) {
+      plantSelect.selectedIndex = 0;
     }
+  }
+
+  const chips = document.querySelectorAll('#scenarioChips .chip');
+  chips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      chips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      scenarioMode = chip.dataset.mode;
+    });
+  });
+
+  const planBtn = document.getElementById('btnPlan');
+  if (planBtn) {
+    planBtn.addEventListener('click', buildPlanFromOrders);
+  }
 
   const btnTest = document.getElementById('btnTestOptimize');
   if (btnTest) {
@@ -273,6 +273,8 @@
   if (btnTariff) {
     btnTariff.addEventListener('click', callTariffDemo);
   }
+}
+    
 
   function flyToThailand(){
     viewer.camera.flyTo({
@@ -598,6 +600,7 @@ const url =
 </script>    
 </body>
 </html>
+
 
 
 

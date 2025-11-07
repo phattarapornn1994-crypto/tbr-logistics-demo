@@ -148,6 +148,9 @@
       </select>
 
       <button id="btnPlan">คำนวณแผนจาก Orders.json</button>
+      <button id="btnTestOptimize" style="margin-top:4px; background:#444;">
+        ทดสอบเรียก Optimize API (Cloudflare)
+      </button>
 
       <div class="legend">
         <span><span class="dot dot-plant"></span>Plant</span>
@@ -215,6 +218,24 @@
         opt.textContent = p.name;
         plantSelect.appendChild(opt);
       });
+      
+       if(plantSelect.options.length > 0){
+         plantSelect.selectedIndex = 0;
+       }
+      document.querySelectorAll('#scenarioChips .chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('#scenarioChips .chip').forEach(c => c.classList.remove('active'));
+          chip.classList.add('active');
+          scenarioMode = chip.dataset.mode;
+        });
+      });
+      document.getElementById('btnPlan').addEventListener('click', buildPlanFromOrders);
+       // 🔹 ปุ่มทดสอบเรียก Optimize API
+      const btnTest = document.getElementById('btnTestOptimize');
+      if (btnTest) {
+        btnTest.addEventListener('click', callOptimizeDemo);
+        }
+      }      
 
       // default: ถ้ามี plant แรก เลือกให้เลย
       if(plantSelect.options.length > 0){
@@ -516,6 +537,51 @@
       return R*c;
     }
     function toRad(d){return d*Math.PI/180;}
+    
+    // ===== ทดสอบเรียก API /optimize จาก Cloudflare Functions =====
+async function callOptimizeDemo() {
+  const summaryEl = document.getElementById('routeSummary');
+  if (summaryEl) {
+    summaryEl.innerHTML = 'กำลังเรียก /optimize จาก Cloudflare ...';
+  }
+
+  try {
+    const res = await fetch('/optimize');
+    if (!res.ok) {
+      throw new Error('HTTP ' + res.status);
+    }
+    const data = await res.json();
+
+    // แสดงผลแบบอ่านง่ายใน routeSummary
+    const best = data.best;
+    const lines = [];
+    lines.push(`<b>ผลจาก /optimize (เดโม่)</b>`);
+    lines.push(`ต้องขน: ${data.demandTon} ton, ระยะทาง: ${data.distanceKm} km`);
+    data.options.forEach((opt, i) => {
+      lines.push(
+        `ตัวเลือก ${i+1}: ${opt.mode} (${opt.truckId}) - Trips: ${opt.trips}, `
+        + `Cost: ${opt.totalCost.toFixed(0)} บาท (${opt.costPerTon.toFixed(0)} บาท/ton)`
+      );
+    });
+    if (best) {
+      lines.push(
+        `<span style="color:#168f3a;"><b>แนะนำ:</b> ${best.mode} (${best.truckId}), `
+        + `~${best.totalCost.toFixed(0)} บาท (${best.costPerTon.toFixed(0)} บาท/ton)</span>`
+      );
+    }
+
+    if (summaryEl) {
+      summaryEl.innerHTML = lines.join('<br/>');
+    }
+  } catch (err) {
+    console.error(err);
+    if (summaryEl) {
+      summaryEl.innerHTML = 'เรียก /optimize ไม่สำเร็จ: ' + err.message;
+    }
+  }
+}
+    
   </script>
 </body>
 </html>
+

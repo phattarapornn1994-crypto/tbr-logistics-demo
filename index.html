@@ -333,6 +333,11 @@
       geocoder:false,
       sceneModePicker:true
     });
+function flyToThailand() {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(100.5, 15.5, 2500000.0)
+  });
+}
 
     let locations = [];
     let materials = [];
@@ -1045,5 +1050,6 @@ function updateLoadDashboard() {
   </script>
 </body>
 </html>
+
 
 

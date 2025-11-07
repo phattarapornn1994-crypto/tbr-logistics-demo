@@ -121,6 +121,16 @@
   </style>
 </head>
 <body>
+  
+  <div class="section" id="mainMenu">
+  <div class="chips">
+    <div class="chip active" data-view="planning">Planning</div>
+    <div class="chip" data-view="cost">Cost</div>
+    <div class="chip" data-view="tracking">Tracking</div>
+    <div class="chip" data-view="reports">Reports</div>
+  </div>
+</div>
+
   <div id="sidebar">
     <div>
       <div class="brand">Logistics Planner 3D</div>
@@ -776,11 +786,21 @@ async function callTariffDemo() {
     summaryEl.innerHTML = 'เรียก /tariff/calc ไม่สำเร็จ: ' + err.message;
   }
 }
-
+document.querySelectorAll('#mainMenu .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#mainMenu .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    const view = chip.dataset.view;
+    // ตอนนี้ให้เราโชว์ทุก section ไว้ก่อน
+    // ถ้าอยากซ่อน/โชว์จริง ค่อยคุมด้วย class แยกทีหลัง
+  });
+});
+    
 
 </script>    
 </body>
 </html>
+
 
 
 

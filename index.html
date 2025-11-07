@@ -430,8 +430,16 @@ function initUI(){
           }
         });
 
-        const routeId = 'R' + routeIndex;
-        routeEntities.push({ id:routeId, entity, mode:chosen.mode });
+const routeId = 'R' + routeIndex;
+routeEntities.push({
+  id: routeId,
+  entity,
+  mode: chosen.mode,
+  originId: origin.locationId,
+  plantId: plant.locationId,
+  ton: chosen.ton,
+  distanceKm: distanceKm * 2 // ไป-กลับ
+});
 
         const modeLabel = chosen.mode === 'own' ? 'รถบริษัท' : 'Outsource';
         const truckLabel = chosen.truck.displayName || chosen.truck.vendorName || chosen.truck.truckType || chosen.truck.id;
@@ -693,6 +701,7 @@ async function callTariffDemo() {
 </script>    
 </body>
 </html>
+
 
 
 

@@ -2,10 +2,126 @@
 <html lang="th">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>TBR Logistics Demo</title>
+
+  <!-- สไตล์เล็กน้อย (inline) เพื่อลดปัญหา path -->
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#f6f8fa;color:#0f172a}
+    .topbar{background:#0f172a;color:#fff;padding:12px 16px;font-weight:600}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px}
+    .btn{display:inline-block;background:#059669;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer}
+    .btn.secondary{background:#fff;color:#059669;border:1px solid #059669}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px}
+    @media(min-width:960px){.grid{grid-template-columns:1fr 1fr}}
+    .label{font-size:12px;color:#475569;font-weight:600;margin-bottom:4px}
+    input,select,textarea{width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px}
+    #map{height:380px;border:1px solid #e2e8f0;border-radius:12px}
+    .hint{font-size:12px;color:#64748b}
+  </style>
+
+  <!-- Leaflet (ไม่ต้องใช้ API key) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
-  <h1>It works 🎉</h1>
-  <p>ถ้าเห็นหน้านี้ แปลว่า GitHub Pages ใช้งานได้แล้ว</p>
+  <div class="topbar">TBR Logistics Demo — Route Planning (Static)</div>
+
+  <div class="wrap">
+    <div class="grid">
+      <!-- ซ้าย: ฟอร์มวางแผน -->
+      <div class="card">
+        <div class="label">ชื่อเส้นทาง</div>
+        <input id="routeName" placeholder="เช่น รอบภาคกลาง 1" />
+
+        <div class="grid" style="margin-top:8px">
+          <div>
+            <div class="label">คนขับ</div>
+            <input id="driver" placeholder="ชื่อคนขับ" />
+          </div>
+          <div>
+            <div class="label">ยานพาหนะ</div>
+            <input id="vehicle" placeholder="ทะเบียน/ประเภทรถ" />
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px">
+          <div class="label" style="margin:0">จุดแวะ (Stops)</div>
+          <button class="btn secondary" id="btnAdd">+ เพิ่มจุด</button>
+        </div>
+
+        <div id="stops" style="max-height:220px;overflow:auto;margin-top:6px"></div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn" id="btnOptimize">Optimize (จำลอง)</button>
+          <button class="btn secondary" onclick="window.print()">พิมพ์</button>
+        </div>
+        <div class="hint" style="margin-top:8px">
+          * เวอร์ชันนี้เป็น Static เดโมไว้ให้หน้าเว็บขึ้นก่อน ไม่มี API / เซิร์ฟเวอร์ใด ๆ
+        </div>
+      </div>
+
+      <!-- ขวา: แผนที่ -->
+      <div class="card">
+        <div id="map"></div>
+        <div class="hint" style="margin-top:6px">
+          แผนที่นี้ใช้ OpenStreetMap ผ่าน Leaflet (ไม่ต้องใช้คีย์) — เหมาะกับ GitHub Pages
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ===== Map =====
+    const map = L.map('map').setView([13.7563, 100.5018], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    const markers = [];
+    const stops = document.getElementById('stops');
+    const btnAdd = document.getElementById('btnAdd');
+    const btnOptimize = document.getElementById('btnOptimize');
+
+    function addStopRow(lat=13.75, lng=100.5, name='จุดส่งสินค้า') {
+      const id = Date.now().toString();
+      const row = document.createElement('div');
+      row.style.display = 'grid';
+      row.style.gridTemplateColumns = '1fr 1fr auto';
+      row.style.gap = '6px';
+      row.style.marginBottom = '6px';
+      row.innerHTML = `
+        <input data-id="${id}" class="inpName" placeholder="ชื่อ/ลูกค้า" value="${name}">
+        <input data-id="${id}" class="inpCoord" placeholder="ละติจูด,ลองจิจูด" value="${lat.toFixed(5)},${lng.toFixed(5)}">
+        <button class="btn secondary" data-id="${id}">ปักหมุด</button>
+      `;
+      stops.appendChild(row);
+
+      row.querySelector('button').onclick = () => {
+        const coord = row.querySelector('.inpCoord').value.trim();
+        const [latStr, lngStr] = coord.split(',');
+        const lat = parseFloat(latStr), lng = parseFloat(lngStr);
+        if (isNaN(lat) || isNaN(lng)) { alert('พิกัดไม่ถูกต้อง'); return; }
+        const mk = L.marker([lat, lng]).addTo(map).bindPopup(row.querySelector('.inpName').value || 'Stop');
+        markers.push(mk);
+        map.setView([lat, lng], 10);
+      }
+    }
+
+    btnAdd.onclick = () => addStopRow();
+
+    btnOptimize.onclick = () => {
+      if (markers.length < 2) { alert('เพิ่ม/ปักหมุดอย่างน้อย 2 จุด'); return; }
+      const latlngs = markers.map(m => m.getLatLng());
+      if (window.routeLine) map.removeLayer(window.routeLine);
+      window.routeLine = L.polyline(latlngs, { weight: 4 }).addTo(map);
+      map.fitBounds(window.routeLine.getBounds(), { padding: [20,20] });
+      alert('จำลองลำดับเส้นทางตามลำดับที่ปักหมุด (demo)');
+    }
+
+    // เตรียมแถวแรกให้ลอง
+    addStopRow(13.7563, 100.5018, 'Bangkok');
+  </script>
 </body>
 </html>
